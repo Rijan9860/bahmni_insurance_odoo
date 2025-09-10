@@ -1,0 +1,1 @@
+# bahmni_insurance_odoo
