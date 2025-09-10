@@ -1,0 +1,3 @@
+id,name,model_id:id,group_id:id,perm_read,perm_write,perm_create,perm_unlink
+bahmni_insurance_odoo.access_insurance_claim_user,access_insurance_claim_user,bahmni_insurance_odoo.model_insurance_claim,group_insurance_claim_user,1,1,1,1
+bahmni_insurance_odoo.access_insurance_claim_manager,access_insurance_claim_manager,bahmni_insurance_odoo.model_insurance_claim,group_insurance_claim_manager,1,1,1,1

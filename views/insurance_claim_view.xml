@@ -1,0 +1,32 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+    <record id="insurance_claim_form_view" model="ir.ui.view">
+        <field name="name">Insurance Claim Form View</field>
+        <field name="model">insurance.claim</field>
+        <field name="arch" type="xml">
+            <form string="Claims">
+                <sheet>
+                    <group>
+                        <field name="claim_code"/>
+                    </group>
+                </sheet>
+            </form>
+        </field>
+    </record>
+    <record id="insurance_claim_tree_view" model="ir.ui.view">
+        <field name="name">Insurance Claim Tree View</field>
+        <field name="model">insurance.claim</field>
+        <field name="arch" type="xml">
+            <tree string="Claims">
+                <field name="claim_code"/>
+            </tree>
+        </field>
+    </record>
+    <record id="action_claims" model="ir.actions.act_window">
+        <field name="name">Insurance Claims</field>
+        <field name="res_model">insurance.claim</field>
+        <field name="view_mode">tree,form</field>
+        <field name="view_id" ref="insurance_claim_tree_view"></field>
+    </record>
+    <menuitem id="menu_claims" name="Claims" sequence="10" parent="menu_emr" action="action_claims"/>
+</odoo>

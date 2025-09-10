@@ -1,0 +1,5 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+    <menuitem id="menu_bahmni_insurance_odoo" name="Bahmni Insurance Odoo" sequence="10"/>
+    <menuitem id="menu_emr" name="EMR" sequence="10" parent="menu_bahmni_insurance_odoo"/>
+</odoo>
