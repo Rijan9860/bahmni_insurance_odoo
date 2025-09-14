@@ -17,6 +17,12 @@
                 <field name="shop_id"/>
                 <field name="claim_id"/>
             </xpath>
+            <xpath expr="//field[@name='order_line']/tree/field[@name='product_template_id']" position="attributes">
+                <attribute name="domain">[('shop_id', '=', parent.shop_id)]</attribute>
+            </xpath>
+            <xpath expr="//field[@name='order_line']/tree/field[@name='name']" position="after">
+                <field name="payment_type"/>
+            </xpath>
         </field>
     </record>
 </odoo>

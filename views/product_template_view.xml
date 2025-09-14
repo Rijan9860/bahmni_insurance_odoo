@@ -8,7 +8,7 @@
             <xpath expr="//notebook" position="before">
                 <group>
                     <group>
-                        <field name="shop_id" string="Selling Department"/>
+                        <field name="shop_id"/>
                     </group>
                 </group>
             </xpath>

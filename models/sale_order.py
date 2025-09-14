@@ -14,7 +14,7 @@ class SaleOrderInherit(models.Model):
         ('cash', 'CASH'),
         ('insurance', 'INSURANCE'),
         ('free', 'FREE')
-    ], string="Payment Type")
+    ], string="Payment Type", default="cash")
     external_visit_uuid = fields.Char(string="External Id")
     care_setting = fields.Selection([
         ('opd', 'OPD'),
@@ -25,20 +25,37 @@ class SaleOrderInherit(models.Model):
     shop_id = fields.Selection([
         ('registration', 'Registration'),
         ('pharmacy', 'Pharmacy')
-    ])
+    ], string="Shop", default="pharmacy")
 
-    @api.onchange('shop_id')
-    def _onchange_product(self):
-        for rec in self:
-            if rec.shop_id:
-                _logger.info("Shop Id---->%s", rec.shop_id)
+    @api.onchange('payment_type')
+    def _onchange_unit_price(self):
+        if self.payment_type == "insurance":
+            for rec in self.order_line:
+                if rec.product_template_id:
+                    _logger.info("Product Template Id---->%s", rec.product_template_id) 
+                    insurance_odoo = self.env['insurance.odoo.product.map'].search([
+                        ('odoo_product', '=', rec.product_template_id.id)
+                    ]) 
+                    if insurance_odoo:
+                        rec.price_unit = insurance_odoo.insurance_product_price  
+                        _logger.info("Insurance Odoo---->%s", rec.price_unit)     
+        else:
+            for rec in self.order_line:
                 product_template = self.env['product.template'].search([
-                    ('shop_id', '=', rec.shop_id)
+                    ('id', '=', rec.product_template_id.id)
                 ])
-                _logger.info("Product Template---->%s", product_template)
-                # for pt in product_template:
-                #     _logger.info("asd---->%s", pt)
-                #     if pt:
-                #         rec.order_line.product_template_id = pt
-                #         _logger.info("asd---->%s", rec.order_line.product_template_id)
+                if product_template:
+                    rec.price_unit = product_template.list_price
+                    
+class SaleOrderLineInherit(models.Model):
+    _inherit = 'sale.order.line'
+    _description = 'Sale Order Line Inherit'
+    
+    payment_type = fields.Selection([
+        ('cash', 'CASH'),
+        ('insurance', 'INSURANCE'),
+        ('free', 'FREE')
+    ], string="Payment Type", related="order_id.payment_type", readonly=False)
+
+
                 
