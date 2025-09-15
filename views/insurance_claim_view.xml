@@ -62,11 +62,39 @@
             </tree>
         </field>
     </record>
-    <record id="action_claims" model="ir.actions.act_window">
-        <field name="name">Claims</field>
+    <record id="action_insurance_claims" model="ir.actions.act_window">
+        <field name="name">Insurace Claims</field>
         <field name="res_model">insurance.claim</field>
         <field name="view_mode">tree,form</field>
         <field name="view_id" ref="insurance_claim_tree_view"></field>
     </record>
-    <menuitem id="menu_claims" name="Claims" sequence="10" parent="menu_insurance_claims" action="action_claims"/>
+    <record id="action_submitted_claims" model="ir.actions.act_window">
+        <field name="name">Submitted Claims</field>
+        <field name="res_model">insurance.claim</field>
+        <field name="view_mode">tree,form</field>
+        <field name="view_id" ref="insurance_claim_tree_view"></field>
+    </record>
+    <record id="action_rejected_claims" model="ir.actions.act_window">
+        <field name="name">Rejected Claims</field>
+        <field name="res_model">insurance.claim</field>
+        <field name="view_mode">tree,form</field>
+        <field name="view_id" ref="insurance_claim_tree_view"></field>
+    </record>
+    <record id="action_checked_claims" model="ir.actions.act_window">
+        <field name="name">Checked Claims</field>
+        <field name="res_model">insurance.claim</field>
+        <field name="view_mode">tree,form</field>
+        <field name="view_id" ref="insurance_claim_tree_view"></field>
+    </record>
+    <record id="action_approved_claims" model="ir.actions.act_window">
+        <field name="name">Approved Claims</field>
+        <field name="res_model">insurance.claim</field>
+        <field name="view_mode">tree,form</field>
+        <field name="view_id" ref="insurance_claim_tree_view"></field>
+    </record>
+    <menuitem id="menu_claims" name="Claims" sequence="10" parent="menu_insurance_claims" action="action_insurance_claims"/>
+    <menuitem id="menu_submitted_claims" name="Submitted Claims" sequence="10" parent="menu_insurance_claims" action="action_submitted_claims"/>
+    <menuitem id="menu_rejected_claims" name="Rejected Claims" sequence="10" parent="menu_insurance_claims" action="action_rejected_claims"/>
+    <menuitem id="menu_checked_claims" name="Checked Claims" sequence="10" parent="menu_insurance_claims" action="action_checked_claims"/>
+    <menuitem id="menu_approved_claims" name="Approved Claims" sequence="10" parent="menu_insurance_claims" action="action_approved_claims"/>
 </odoo>

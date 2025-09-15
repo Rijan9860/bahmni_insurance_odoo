@@ -1,5 +1,6 @@
 from odoo import api, models, fields
 from odoo.exceptions import ValidationError
+import odoo.addons.decimal_precision as dp
 
 import logging
 _logger = logging.getLogger(__name__)
@@ -39,13 +40,18 @@ class SaleOrderInherit(models.Model):
                     if insurance_odoo:
                         rec.price_unit = insurance_odoo.insurance_product_price  
                         _logger.info("Insurance Odoo---->%s", rec.price_unit)     
-        else:
+        elif self.payment_type == "cash":
             for rec in self.order_line:
                 product_template = self.env['product.template'].search([
                     ('id', '=', rec.product_template_id.id)
                 ])
                 if product_template:
                     rec.price_unit = product_template.list_price
+        else:
+            pass
+
+    def action_confirm(self):
+        _logger.info("Action Confrim Overwritten")
                     
 class SaleOrderLineInherit(models.Model):
     _inherit = 'sale.order.line'
