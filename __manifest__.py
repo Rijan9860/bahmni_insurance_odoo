@@ -9,8 +9,8 @@
     'website': "",
     'depends': ['sale'],
     'data': [
-        'security/ir.model.access.csv',
         'security/insurance_security.xml',
+        'security/ir.model.access.csv',
         'views/menu_view.xml',
         'views/sale_order_view.xml',
         'views/insurance_claim_view.xml',
@@ -18,7 +18,9 @@
         'views/insurance_odoo_product_map_view.xml',
         'views/payment_journal_mapping_view.xml',
         'views/insurance_disease_code_view.xml',
-        'views/product_template_view.xml'
+        'views/product_template_view.xml',
+        'views/insurance_config_settings_view.xml',
+        'views/account_invoice_view.xml'
     ],
     'installable': True,
     'application': True,
