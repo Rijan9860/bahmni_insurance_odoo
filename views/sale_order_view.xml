@@ -33,11 +33,11 @@
                 <group name="note_group" col="6">
                     <group name="discount" colspan="2">
                         <field name="discount_type"
-                                groups="product.group_discount_per_so_line"/>
-                        <field name="discount_rate"
-                                groups="product.group_discount_per_so_line" attrs="{'readonly': [('discount_type', '=', 'nodiscount')]}"/>
+                            groups="product.group_discount_per_so_line"/>
+                        <field name="discount_rate" 
+                            groups="product.group_discount_per_so_line" attrs="{'readonly': ['|', ('discount_type', '=', 'nodiscount'), ('state', '=','sale')]}"/>
                         <field name="discount_head"
-                                groups="product.group_discount_per_so_line" attrs="{'invisible': [('discount_type', '==', 'nodiscount')]}"/>
+                            groups="product.group_discount_per_so_line" attrs="{'invisible': [('discount_type', '==', 'nodiscount')]}"/>
                     </group>
                     <group class="oe_subtotal_footer oe_right" colspan="2"
                             name="sale_total">

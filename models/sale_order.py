@@ -34,16 +34,15 @@ class SaleOrderInherit(models.Model):
         ],
         string="Discount Type",
         readonly=True,
-        states={'draft': [('readonly', False)], 'sent':[('readonly', True)]},
+        states={'draft': [('readonly', False)], 'sale':[('readonly', True)]},
         required=True,
         default="nodiscount"
     )
     discount_rate = fields.Float(string="Discount Rate", digits=dp.get_precision('Account'), 
         readony=True,
-        required=True,
-        states={'draft': [('readonly', False)], 'sent':[('readonly', True)]},
+        required=True
     )
-    discount_head = fields.Many2one('account.account', string="Discount Head", states={'draft': [('readonly', False)], 'sent': [('readonly', True)]})
+    discount_head = fields.Many2one('account.account', string="Discount Head", states={'draft': [('readonly', False)], 'sale': [('readonly', True)]}, required=True)
     amount_untaxed = fields.Monetary(string="Untaxed Amount", store=True, readonly=True, tracking=True, compute="_amount_all")
     amount_tax = fields.Monetary(string="Taxes", store=True, readonly=True, tracking=True, compute="_amount_all")
     amount_total = fields.Monetary(string="Total", store=True, readonly=True, tracking=True, compute="_amount_all")
