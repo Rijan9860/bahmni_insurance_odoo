@@ -24,10 +24,14 @@
                 <field name="payment_type"/>
             </xpath>
             <xpath expr="//field[@name='order_line']/tree/field[@name='discount']" position="attributes">
+                <attribute name="digits">[16,2]</attribute>
+            </xpath>
+            <xpath expr="//field[@name='order_line']/tree/field[@name='name']" position="attributes">
                 <attribute name="invisible">1</attribute>
             </xpath>
-            <xpath expr="//field[@name='order_line']/tree/field[@name='tax_id']" position="attributes">
-                <attribute name="invisible">1</attribute>
+            <xpath expr="//field[@name='order_line']/tree/field[@name='product_uom_qty']" position="after">
+                <field name="lot_id" domain="[('product_id', '=', product_template_id)]"/>
+                <field name="expiration_date"/>
             </xpath>
             <xpath expr="//group[@name='note_group']" position="replace">
                 <group name="note_group" col="6">

@@ -7,10 +7,11 @@
     """,
     'author': "Rijan Maharjan",
     'website': "",
-    'depends': ['sale'],
+    'depends': ['sale', 'stock', 'purchase'],
     'data': [
         'security/insurance_security.xml',
         'security/ir.model.access.csv',
+        'data/ir_cron.xml',
         'views/menu_view.xml',
         'views/sale_order_view.xml',
         'views/insurance_claim_view.xml',
@@ -20,7 +21,8 @@
         'views/insurance_disease_code_view.xml',
         'views/product_template_view.xml',
         'views/insurance_config_settings_view.xml',
-        'views/account_invoice_view.xml'
+        'views/account_invoice_view.xml',
+        'views/stock_lot_view.xml'
     ],
     'installable': True,
     'application': True,

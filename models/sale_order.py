@@ -38,11 +38,8 @@ class SaleOrderInherit(models.Model):
         required=True,
         default="nodiscount"
     )
-    discount_rate = fields.Float(string="Discount Rate", digits=dp.get_precision('Account'), 
-        readony=True,
-        required=True
-    )
-    discount_head = fields.Many2one('account.account', string="Discount Head", states={'draft': [('readonly', False)], 'sale': [('readonly', True)]}, required=True)
+    discount_rate = fields.Float(string="Discount Rate", digits=dp.get_precision('Account'), default=0.00)
+    discount_head = fields.Many2one('account.account', string="Discount Head", states={'draft': [('readonly', False)], 'sale': [('readonly', True)]})
     amount_untaxed = fields.Monetary(string="Untaxed Amount", store=True, readonly=True, tracking=True, compute="_amount_all")
     amount_tax = fields.Monetary(string="Taxes", store=True, readonly=True, tracking=True, compute="_amount_all")
     amount_total = fields.Monetary(string="Total", store=True, readonly=True, tracking=True, compute="_amount_all")
@@ -88,13 +85,20 @@ class SaleOrderInherit(models.Model):
     
     def _prepare_invoice(self):
         invoice_vals = super(SaleOrderInherit, self)._prepare_invoice()
-        discount_head_name = self.discount_head.code + " " + self.discount_head.name
-        invoice_vals.update({
-            'discount_type': self.discount_type,
-            'discount_rate': self.discount_rate,
-            'discount_head': discount_head_name,
-            'amount_discount': self.amount_discount
-        })
+        if self.discount_type == "percent" or self.discount_type == "amount":
+            discount_head_name = self.discount_head.code + " " + self.discount_head.name
+            invoice_vals.update({
+                'discount_type': self.discount_type,
+                'discount_rate': self.discount_rate,
+                'discount_head': discount_head_name,
+                'amount_discount': self.amount_discount
+            })
+        else:
+            invoice_vals.update({
+                'discount_type': self.discount_type,
+                'discount_rate': self.discount_rate,
+                'amount_discount': self.amount_discount
+            })
         return invoice_vals
    
     @api.onchange('payment_type')
@@ -180,12 +184,37 @@ class SaleOrderInherit(models.Model):
         
         insurance_journal_name = self.env['insurance.config.settings'].get_insurance_journal()
         _logger.info("Insurance Journal Name---->%s", insurance_journal_name)
-        
+
+        """Pass lot/serial number value from sale order to stock picking model"""
+        for sale_order in self:
+            pickings = sale_order.picking_ids.filtered(
+                lambda p: p.picking_type_code == "outgoing" and p.state not in ['done', 'cancel']
+            )
+
+            for picking in pickings:
+                for move in picking.move_ids_without_package:
+                    sale_line = sale_order.order_line.filtered(lambda l: l.product_id == move.product_id and l.lot_id)
+                    if not sale_line:
+                        _logger.warning("No matching sale line found for product %s in %s", move.product_id.display_name, sale_order.name)
+                        continue
+
+                    # If move lines exist, update them
+                    if move.move_line_ids:
+                        _logger.info("Updating move lines for product %s", move.product_id.display_name)
+                        for ml in move.move_line_ids:
+                            ml.lot_id = sale_line.lot_id
+                            ml.qty_done = sale_line.product_uom_qty
+                    else:
+                        _logger.info("No move lines found for %s, skipping create.", move.product_template_id.name)
+
+                # Validate the picking once all moves are updated
+                picking.button_validate()
+                _logger.info("Picking %s validated for Sale Order %s", picking.name, sale_order.name)
+
         return True
 
     # def action_invoice_create_common(self):
 
-                    
 class SaleOrderLineInherit(models.Model):
     _inherit = 'sale.order.line'
     _description = 'Sale Order Line Inherit'
@@ -195,8 +224,20 @@ class SaleOrderLineInherit(models.Model):
         ('insurance', 'INSURANCE'),
         ('free', 'FREE')
     ], string="Payment Type", related="order_id.payment_type", readonly=False)
-    discount = fields.Float(string="Discount (%)", digits=(16, 20), default=0.0)
+    discount = fields.Float(string="Discount (%)", digits=(16, 2), default=0.0)
+    lot_id = fields.Many2one('stock.lot', string="Batch No", store=True)
     # total_discount = fields.Float(string="Total Discount", default=0.0, store=True)
+    expiration_date = fields.Datetime(string="Expiration Date", store=True)
 
-
-                
+    @api.onchange('lot_id')
+    def _get_lot_expiration_date(self):
+        for rec in self:
+            if rec.product_id:
+                if rec.lot_id:
+                    stock_lot = self.env['stock.lot'].search([('id', '=', rec.lot_id.id)])
+                    if stock_lot:
+                        rec.expiration_date = stock_lot.expiration_date
+                        _logger.info("Expiration Date---->%s", rec.expiration_date)
+                    else:
+                        raise ValidationError("Lot Not Matched!!")
+        
