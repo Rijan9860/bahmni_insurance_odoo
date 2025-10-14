@@ -16,7 +16,7 @@ class SaleOrderInherit(models.Model):
         ('insurance', 'INSURANCE'),
         ('free', 'FREE')
     ], string="Payment Type", default="cash")
-    external_visit_uuid = fields.Char(string="External Id")
+    external_visit_uuid = fields.Char(string="External Id", help="This field is used to store visit ID of bahmni api call")
     care_setting = fields.Selection([
         ('opd', 'OPD'),
         ('ipd', 'IPD')
@@ -27,6 +27,7 @@ class SaleOrderInherit(models.Model):
         ('registration', 'Registration'),
         ('pharmacy', 'Pharmacy')
     ], string="Shop", default="pharmacy")
+    partner_uuid = fields.Char(string="Customer UUID", store=True, readonly=True)
     discount_type = fields.Selection([
         ('nodiscount', 'No Discount'),
         ('percent', 'Percentage'),
@@ -44,6 +45,7 @@ class SaleOrderInherit(models.Model):
     amount_tax = fields.Monetary(string="Taxes", store=True, readonly=True, tracking=True, compute="_amount_all")
     amount_total = fields.Monetary(string="Total", store=True, readonly=True, tracking=True, compute="_amount_all")
     amount_discount = fields.Monetary(string="Discount", store=True, readonly=True, digits=dp.get_precision('Amount'), tracking=True, compute="_amount_all")
+    picking_ids = fields.One2many('stock.picking', 'sale_id', string='Transfers')
 
     @api.depends('order_line.price_total')
     def _amount_all(self):
@@ -62,7 +64,7 @@ class SaleOrderInherit(models.Model):
             })
     
     @api.onchange('discount_type', 'discount_rate', 'order_line')
-    def supply_rate(self):
+    def _supply_rate(self):
         """supply discount into order line"""
         for order in self:
             if order.discount_type == "percent" and order.discount_rate > 0:
@@ -136,7 +138,7 @@ class SaleOrderInherit(models.Model):
                     if sale_order_line.product_template_id:
                         _logger.info("Product Template Id---->%s", sale_order_line.product_template_id) 
                         insurance_odoo = self.env['insurance.odoo.product.map'].search([
-                            ('odoo_product', '=', sale_order_line.product_template_id.id)
+                            ('odoo_product_id', '=', sale_order_line.product_template_id.id)
                         ]) 
                         if insurance_odoo:
                             sale_order_line.price_unit = insurance_odoo.insurance_product_price 
@@ -181,19 +183,18 @@ class SaleOrderInherit(models.Model):
         if self[:1].create_uid.has_group('sale.group_auto_done_setting'):
             # Public user can confirm SO, so we check the group on any record creator.
             self.action_done()
-        
-        insurance_journal_name = self.env['insurance.config.settings'].get_insurance_journal()
-        _logger.info("Insurance Journal Name---->%s", insurance_journal_name)
 
         """Pass lot/serial number value from sale order to stock picking model"""
         for sale_order in self:
             pickings = sale_order.picking_ids.filtered(
                 lambda p: p.picking_type_code == "outgoing" and p.state not in ['done', 'cancel']
             )
+            _logger.info("Pickings---->%s", pickings)
 
             for picking in pickings:
                 for move in picking.move_ids_without_package:
                     sale_line = sale_order.order_line.filtered(lambda l: l.product_id == move.product_id and l.lot_id)
+                    _logger.info("Sale Order line---->%s", sale_line)
                     if not sale_line:
                         _logger.warning("No matching sale line found for product %s in %s", move.product_id.display_name, sale_order.name)
                         continue
@@ -205,16 +206,24 @@ class SaleOrderInherit(models.Model):
                             ml.lot_id = sale_line.lot_id
                             ml.qty_done = sale_line.product_uom_qty
                     else:
-                        _logger.info("No move lines found for %s, skipping create.", move.product_template_id.name)
+                        _logger.info("No move lines found for %s, skipping create.", move.product_id.display_name)
 
                 # Validate the picking once all moves are updated
                 picking.button_validate()
                 _logger.info("Picking %s validated for Sale Order %s", picking.name, sale_order.name)
+        
+        for order in self:
+            _logger.info("Sale Order Id:%s", order)
+            self.action_invoice_create_commons(order)
 
         return True
 
-    # def action_invoice_create_common(self):
-
+    def action_invoice_create_commons(self, order):
+        _logger.info("Inside action invoice create commons overwritten")
+        for order in self:
+            _logger.info("Sale Order Id:%s", order)
+            self.env['insurance.claim']._create_claim(order)
+            
 class SaleOrderLineInherit(models.Model):
     _inherit = 'sale.order.line'
     _description = 'Sale Order Line Inherit'
@@ -227,7 +236,7 @@ class SaleOrderLineInherit(models.Model):
     discount = fields.Float(string="Discount (%)", digits=(16, 2), default=0.0)
     lot_id = fields.Many2one('stock.lot', string="Batch No", store=True)
     # total_discount = fields.Float(string="Total Discount", default=0.0, store=True)
-    expiration_date = fields.Datetime(string="Expiration Date", store=True)
+    expiration_date = fields.Datetime(string="Expiration Date", store=True, readonly=True)
 
     @api.onchange('lot_id')
     def _get_lot_expiration_date(self):
@@ -240,4 +249,16 @@ class SaleOrderLineInherit(models.Model):
                         _logger.info("Expiration Date---->%s", rec.expiration_date)
                     else:
                         raise ValidationError("Lot Not Matched!!")
+                    
+    @api.constrains('lot_id')
+    def _check_lot(self):
+        for rec in self:
+            if rec.order_id.shop_id == "pharmacy":
+                if rec.product_id:
+                    if not rec.lot_id:
+                        _logger.info("Lot Id is required for Storable Produts")
+                        raise ValidationError("Lot Id is required for Storable Produts")
+                    
+                    
+            
         

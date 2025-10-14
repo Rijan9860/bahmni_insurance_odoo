@@ -7,6 +7,7 @@ class StockLotInherit(models.Model):
     _inherit = 'stock.lot'
     _description = 'Inherit Inventory Module'
 
+    expiration_date = fields.Datetime(string='Expiration Date', compute='_compute_expiration_date', store=True, readonly=False, help='This is the date on which the goods with this Serial Number may become dangerous and must not be consumed.')
     expired_state = fields.Char(string="Expiration Status", default="NOTEXPIRED", store=True, compute="_check_the_date")
     is_active = fields.Boolean(string="Active", default=True)
 

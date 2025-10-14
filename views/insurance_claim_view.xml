@@ -16,8 +16,8 @@
                             <field name="claim_uuid"/>
                         </group>
                         <group>
-                            <field name="creation_date"/>
-                            <field name="claims_manager"/>
+                            <field name="claimed_date"/>
+                            <field name="claim_manager_id"/>
                         </group>
                     </group>
                     <notebook>
@@ -26,8 +26,8 @@
                                 <tree editable="bottom">
                                     <field name="product_id"/>
                                     <field name="imis_product_code"/>
-                                    <field name="quantity"/>
-                                    <field name="unit_price"/>
+                                    <field name="product_qty"/>
+                                    <field name="price_unit"/>
                                     <field name="total"/>
                                 </tree>
                             </field>
@@ -55,9 +55,9 @@
         <field name="arch" type="xml">
             <tree string="Claims">
                 <field name="nhis_number"/>
-                <field name="creation_date"/>
+                <field name="claimed_date"/>
                 <field name="partner_id"/>
-                <field name="claims_manager"/>
+                <field name="claim_manager_id"/>
                 <field name="care_setting"/>
             </tree>
         </field>

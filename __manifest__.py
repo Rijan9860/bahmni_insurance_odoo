@@ -11,7 +11,7 @@
     'data': [
         'security/insurance_security.xml',
         'security/ir.model.access.csv',
-        'data/ir_cron.xml',
+        # 'data/ir_cron.xml',
         'views/menu_view.xml',
         'views/sale_order_view.xml',
         'views/insurance_claim_view.xml',
