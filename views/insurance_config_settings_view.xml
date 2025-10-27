@@ -13,8 +13,8 @@
                 <sheet>
                 <separator string="Insurance Connect Configuration"/>
                 <group string="Bahmni Credentials">
-                    <field name="username" string="प्रयोगकर्ता नाम"/>
-                    <field name="password" string="पासवर्ड"/>
+                    <field name="username" string="Username"/>
+                    <field name="password" string="Password"/>
                     <field name="base_url"/>
                 </group>
                 <group string="OpenMRS Credentials">

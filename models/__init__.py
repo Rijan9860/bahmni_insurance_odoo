@@ -6,6 +6,4 @@ from . import payment_journal_mapping
 from . import insurance_disease_code
 from . import product_template
 from . import insurance_config_settings
-from . import account_invoice
 from . import stock_lot
-from . import stock_picking

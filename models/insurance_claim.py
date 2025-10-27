@@ -103,7 +103,8 @@ class InsuranceClaim(models.Model):
         _logger.info("Insurance Sale Order Lines:%s", insurance_sale_order_lines)
 
         if not insurance_sale_order_lines:
-            raise ValidationError("No sale order line found for insurance payment type")
+            _logger.info("No sale order line found for insurance payment type")
+            pass
         
         for sale_order_line in insurance_sale_order_lines:
             _logger.info("Inside insurance sale order line loop")
