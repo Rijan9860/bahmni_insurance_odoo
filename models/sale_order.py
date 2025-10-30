@@ -101,9 +101,12 @@ class SaleOrderInherit(models.Model):
             # Public user can confirm SO, so we check the group on any record creator.
             self.action_done()
         
-        for order in self:
-            _logger.info("Sale Order Id:%s", order)
-            self.action_invoice_create_commons(order)
+        if self.payment_type == "insurance":
+            for order in self:
+                _logger.info("Sale Order Id:%s", order)
+                self.action_invoice_create_commons(order)
+        else:
+            pass
 
         return True
 
