@@ -21,6 +21,8 @@
         'views/insurance_disease_code_view.xml',
         'views/product_template_view.xml',
         'views/insurance_config_settings_view.xml',
+        'views/hib_config_settings_view.xml',
+        'wizard/check_eligibility_response.xml'
         # 'views/stock_lot_view.xml'
     ],
     'installable': True,

@@ -1,7 +1,8 @@
 from odoo import api, models, fields
 from odoo.exceptions import ValidationError, UserError
 import odoo.addons.decimal_precision as dp
-
+import requests
+import base64
 import logging
 _logger = logging.getLogger(__name__)
 
@@ -24,13 +25,13 @@ class SaleOrderInherit(models.Model):
     def _change_payment_type(self):
         for sale_order in self:
             if sale_order.payment_type == "cash":
-                if sale_order.discount_type == "percent" or sale_order.discount_type == "amount":
+                if sale_order.discount_type == "percentage" or sale_order.discount_type == "fixed":
                     _logger.info("########Entered#######")
                     discount_head_id = sale_order.env['account.account'].search([
-                        ('code', '=', 1010001)
+                        ('code', '=', 450000)
                     ]).id
                     if discount_head_id:
-                        sale_order.discount_head = discount_head_id
+                        sale_order.disc_acc_id = discount_head_id
                     else:
                         raise ValidationError("Discount head not found!!")
                 for sale_order_line in sale_order.order_line:
@@ -42,13 +43,13 @@ class SaleOrderInherit(models.Model):
                     else:
                         raise ValidationError("Product Not Mapped!! Please Contact Admin.")
             elif sale_order.payment_type == "insurance":
-                if sale_order.discount_type == "percent" or sale_order.discount_type == "amount":
+                if sale_order.discount_type == "percentage" or sale_order.discount_type == "fixed":
                     _logger.info("########Entered#######")
                     discount_head_id = sale_order.env['account.account'].search([
                         ('code', '=', 1010002)
                     ])
                     if discount_head_id:
-                        sale_order.discount_head = discount_head_id
+                        sale_order.disc_acc_id = discount_head_id
                     else:
                         raise ValidationError("Discount head not found!!")
                 for sale_order_line in sale_order.order_line:
@@ -63,7 +64,81 @@ class SaleOrderInherit(models.Model):
                             raise ValidationError("Product Not Mapped!! Please Contact Admin.")
             else:
                 pass
-    
+
+    def cap_validation(self):
+        _logger.info("******Medicine Cap Validation******")
+        nhis_number = self.nhis_number
+
+        medicine_cap_url = "https://imis.hib.gov.np/api/api_fhir/cap-validation?CHFID={}".format(nhis_number)
+        _logger.debug("Medicine Cap Url----->%s", medicine_cap_url)
+
+        user_credentails = self.env['hib.config.settings'].search([('active', '=', 't')])
+        username = ""
+        password = ""
+        remote_user = ""
+        for rec in user_credentails:
+            username = rec.username
+            password = rec.password
+            remote_user = rec.remote_user
+        
+        #Login Credentials
+        login_data = {
+            "username": username,
+            "password": password,
+            "remote_user": remote_user
+        }
+
+        #Encode Credentials
+        credentials = "{}:{}".format(login_data["username"], login_data["password"])
+        _logger.info("Credentials:%s", credentials)
+        token = base64.b64encode(credentials.encode('utf-8')).decode('utf-8')
+        _logger.info("Token:%s", token)
+
+        #Headers
+        headers = {
+            "remote-user": login_data["remote_user"],
+            "Content-Type": 'application/json',
+            "Authorization": "Basic {}".format(token)
+        }
+
+        _logger.info("Headers:%s", headers)
+
+        # Send the GET request
+        response = requests.get(medicine_cap_url, headers=headers)
+        _logger.info("Response:%s", response)
+
+        #Check if the request was successful 
+        if response.status_code == 200:
+            data = response.json()
+            _logger.info("Cap Validation Results:%s", data)
+            return data
+        else:
+            _logger.info("Error:%s", response.text)
+
+    def check_eligibility(self):
+        _logger.info("Check Eligibility")
+        for rec in self:
+            if rec.nhis_number:
+                # cap_validation = self.cap_validation()
+                # _logger.info("Cap Validation Data:%s", cap_validation)
+                partner_id = rec.partner_id
+                _logger.info("Partner Id:%s", partner_id)
+                elig_response = self.env['insurance.eligibility'].get_insurance_details(partner_id)
+                _logger.info("Eligibilty Response:%s", elig_response)
+                return {
+                    'type': 'ir.actions.act_window',
+                    'name': 'Check Eligibilty',
+                    'res_model': 'insurance.eligibility',
+                    'view_type': 'form',
+                    'view_mode': 'form',
+                    'res_id': elig_response.id,
+                    'view_id': self.env.ref('bahmni_insurance_odoo.insurance_check_eligibility_response_view', False).id,
+                    'target': 'new'
+                }
+            else:
+                _logger.info("No NHIS number")
+                raise UserError("No Insuree Id, Please update and retry !")   
+  
     def action_confirm(self):
         _logger.info("#####Action Confrim Inherit#####")
         """ Confirm the given quotation(s) and set their confirmation date.
@@ -115,6 +190,8 @@ class SaleOrderInherit(models.Model):
         for order in self:
             _logger.info("Sale Order Id:%s", order)
             self.env['insurance.claim']._create_claim(order)
+
+    
             
 class SaleOrderLineInherit(models.Model):
     _inherit = 'sale.order.line'
