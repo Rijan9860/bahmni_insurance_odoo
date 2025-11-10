@@ -26,7 +26,7 @@ class SaleOrderInherit(models.Model):
         for sale_order in self:
             if sale_order.payment_type == "cash":
                 if sale_order.discount_type == "percentage" or sale_order.discount_type == "fixed":
-                    _logger.info("########Entered#######")
+                    _logger.info(f"Payment Type: {sale_order.payment_type}")
                     discount_head_id = sale_order.env['account.account'].search([
                         ('code', '=', 450000)
                     ]).id
@@ -44,9 +44,9 @@ class SaleOrderInherit(models.Model):
                         raise ValidationError("Product Not Mapped!! Please Contact Admin.")
             elif sale_order.payment_type == "insurance":
                 if sale_order.discount_type == "percentage" or sale_order.discount_type == "fixed":
-                    _logger.info("########Entered#######")
+                    _logger.info(f"Payment Type: {sale_order.payment_type}")
                     discount_head_id = sale_order.env['account.account'].search([
-                        ('code', '=', 1010002)
+                        ('code', '=', '101105')
                     ])
                     if discount_head_id:
                         sale_order.disc_acc_id = discount_head_id
@@ -65,79 +65,48 @@ class SaleOrderInherit(models.Model):
             else:
                 pass
 
-    def cap_validation(self):
-        _logger.info("******Medicine Cap Validation******")
-        nhis_number = self.nhis_number
-
-        medicine_cap_url = "https://imis.hib.gov.np/api/api_fhir/cap-validation?CHFID={}".format(nhis_number)
-        _logger.debug("Medicine Cap Url----->%s", medicine_cap_url)
-
-        user_credentails = self.env['hib.config.settings'].search([('active', '=', 't')])
-        username = ""
-        password = ""
-        remote_user = ""
-        for rec in user_credentails:
-            username = rec.username
-            password = rec.password
-            remote_user = rec.remote_user
-        
-        #Login Credentials
-        login_data = {
-            "username": username,
-            "password": password,
-            "remote_user": remote_user
-        }
-
-        #Encode Credentials
-        credentials = "{}:{}".format(login_data["username"], login_data["password"])
-        _logger.info("Credentials:%s", credentials)
-        token = base64.b64encode(credentials.encode('utf-8')).decode('utf-8')
-        _logger.info("Token:%s", token)
-
-        #Headers
-        headers = {
-            "remote-user": login_data["remote_user"],
-            "Content-Type": 'application/json',
-            "Authorization": "Basic {}".format(token)
-        }
-
-        _logger.info("Headers:%s", headers)
-
-        # Send the GET request
-        response = requests.get(medicine_cap_url, headers=headers)
-        _logger.info("Response:%s", response)
-
-        #Check if the request was successful 
-        if response.status_code == 200:
-            data = response.json()
-            _logger.info("Cap Validation Results:%s", data)
-            return data
-        else:
-            _logger.info("Error:%s", response.text)
-
     def check_eligibility(self):
         _logger.info("Check Eligibility")
         for rec in self:
-            if rec.nhis_number:
-                # cap_validation = self.cap_validation()
-                # _logger.info("Cap Validation Data:%s", cap_validation)
-                partner_id = rec.partner_id
-                _logger.info("Partner Id:%s", partner_id)
-                elig_response = self.env['insurance.eligibility'].get_insurance_details(partner_id)
-                _logger.info("Eligibilty Response:%s", elig_response)
-                return {
-                    'type': 'ir.actions.act_window',
-                    'name': 'Check Eligibilty',
-                    'res_model': 'insurance.eligibility',
-                    'view_type': 'form',
-                    'view_mode': 'form',
-                    'res_id': elig_response.id,
-                    'view_id': self.env.ref('bahmni_insurance_odoo.insurance_check_eligibility_response_view', False).id,
-                    'target': 'new'
-                }
+            if rec.company_id.copayment == "yes":
+                if rec.nhis_number:
+                    partner_id = rec.partner_id
+                    _logger.info("Partner Id:%s", partner_id)
+                    elig_response = self.env['insurance.eligibility'].get_insurance_details(partner_id)
+                    _logger.info("Eligibilty Response:%s", elig_response)
+                    discount_head_id = self.env['account.account'].search([('code', '=', '101105')]).id
+                    _logger.info("Discount head Id:%s", discount_head_id)
+                    if elig_response:
+                        copayment_value = elig_response.copayment_value
+                        _logger.info("Copayment Value:%s", copayment_value)
+                        if copayment_value > 0:
+                            self.discount_type = 'percentage'
+                            _logger.info("Discount Type:%s", self.discount_type)
+                            self.discount_percentage = copayment_value * 100
+                            _logger.info("Discount Percentage:%s", self.discount_percentage)
+                            self.discount = self.amount_untaxed * (self.discount_percentage / 100)
+                            _logger.info("Discount Amount:%s", self.discount)
+                            self.disc_acc_id = discount_head_id
+                            _logger.info("Discount Account Id:%s", self.disc_acc_id)
+                    else:
+                        _logger.info("No Response from the IMIS Server")
+                    return {
+                        'type': 'ir.actions.act_window',
+                        'name': 'Check Eligibilty',
+                        'res_model': 'insurance.eligibility',
+                        'view_type': 'form',
+                        'view_mode': 'form',
+                        'res_id': elig_response.id,
+                        'view_id': self.env.ref('bahmni_insurance_odoo.insurance_check_eligibility_response_view', False).id,
+                        'target': 'new'
+                    }
+                else:
+                    _logger.info("No NHIS number")
+                    raise UserError("No Insuree Id, Please update and retry !")   
             else:
-                _logger.info("No NHIS number")
-                raise UserError("No Insuree Id, Please update and retry !")   
+                company_name = rec.company_id.name
+                _logger.info(f"Copayment Not Applied for {company_name}")
+                raise UserError("Copayment Not Applied for %s", company_name)
   
     def action_confirm(self):
         _logger.info("#####Action Confrim Inherit#####")

@@ -53,34 +53,6 @@ class InsuranceConnect(models.TransientModel):
             return self.response_processor(req)
         except Exception as err:
             _logger.error("\n Processing event threw error: %s", err)
-
-    # def _check_eligibilty(self, nhis_number):
-    #     _logger.info("Inside _check_eligibility, NHIS Number:%s", nhis_number)
-    #     try:
-    #         urllib3.disable_warnings(urllib3.exceptions.InsecureRequestWarning)# Disable SSL Warning
-    #         php_url = "https://192.168.56.152:4433/insurance/eligibility.php"
-    #         _logger.info("PHP Url:%s", php_url)
-
-    #         params = {
-    #             "identifier": nhis_number
-    #         }
-    #         response = requests.get(php_url, params=params, timeout=10, verify=False)
-    #         _logger.info("Response Status Code:%s", response.status_code)
-    #         if response.status_code == 200:
-    #             try:
-    #                 _logger.info("*************************************************************")
-    #                 data = response.json()
-    #                 _logger.info("Data:%s", data)
-    #                 return data
-    #             except Exception as e:
-    #                 _logger.error("Json Decode Error:%s", e)
-    #         else:
-    #             _logger.info("Failed to get eligibilty data, status_code:%s", response.text)
-    #         # response = self.env['insurance.connect']._check_eligibilty(nhis_number)
-    #         # _logger.info("Response:%s", response)
-    #     except requests.exceptions.RequestException as e:
-    #         _logger.error("Error while calling php endpoint:%s", e)
-    #         return None
             
     def response_processor(self, response):
         _logger.info("********Response********")

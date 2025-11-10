@@ -38,6 +38,7 @@ class InsuranceEligibility(models.TransientModel):
                 for elig_response_line in response['eligibilityBalance']:
                     raw_date = elig_response_line['validDate']
                     dt_obj = parse(raw_date)
+                    _logger.info("Parse DateTime:%s", dt_obj)
                     # Only the date part
                     valid_date = dt_obj.date()
                     elig_response_line = {

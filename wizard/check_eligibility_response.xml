@@ -18,11 +18,11 @@
                         </group>
                     </group>
                     <group readonly="True">
-                        <field name="eligibility_line_item" string="Details" readonly="True">
+                        <field name="eligibility_line_item" string="Detail" readonly="True">
                             <tree open="false">
                                 <field name="eligibility_balance" />
                                 <field name="category" />
-                                <field name="valid_date" />
+                                <field name="valid_date" widget="date" options="{'format': 'dd/MM/yyyy'}" />
                             </tree>
                         </field>
                     </group>
