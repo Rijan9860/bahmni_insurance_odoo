@@ -65,8 +65,17 @@ class SaleOrderInherit(models.Model):
             else:
                 pass
 
+    def cap_validation(self):
+        _logger.info("Cap Validation")
+        for rec in self:
+            partner_id = rec.partner_id
+            _logger.info("Partner Id:%s", partner_id)
+            capvalidation_response = self.env['insurance.capvalidation'].get_cap_validation(partner_id)
+            _logger.info("Capvalidation Response:%s", capvalidation_response)
+
     def check_eligibility(self):
         _logger.info("Check Eligibility")
+        self.cap_validation()
         for rec in self:
             if rec.company_id.copayment == "yes":
                 if rec.nhis_number:
