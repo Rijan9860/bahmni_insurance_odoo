@@ -7,6 +7,7 @@ class InsuranceCapvalidation(models.TransientModel):
     _name = 'insurance.capvalidation'
     _description = 'Insurance Capvalidation'
 
+    nhis_number = fields.Char(string="NHIS Number")
     code = fields.Char(string="Code")
     name = fields.Char(string="Name")
     cap_qty_peroid = fields.Integer(string="Cap Quantity")
@@ -24,17 +25,19 @@ class InsuranceCapvalidation(models.TransientModel):
             response = self.env['insurance.connect']._get_capvalidation(nhis_number)
             _logger.info("Response:%s", response)
             if response:
-                for cap_validation_response in response:
-                    cap_validation_response = {
-                        'code': cap_validation_response['code'],
-                        'name': cap_validation_response['name'],
-                        'cap_qty_peroid': cap_validation_response['capQtyPeroid'], # Cap Quantity in number
-                        'cap_qrst_peroid': cap_validation_response['capQrstPeroid'], # Cap peroid in days
-                        'type': cap_validation_response['itemServ'],
-                        'qty_used': cap_validation_response['qtyUsed'], # used quantity in number
-                        'qty_remain': cap_validation_response['qtyRemain'] # remaining quantity in number
+                for res in response:
+                    cap_validation_data = {
+                        'nhis_number': res['nhisId'],
+                        'code': res['code'],
+                        'name': res['name'],
+                        'cap_qty_peroid': res['capQtyPeroid'], # Cap Quantity in number
+                        'cap_qrst_peroid': res['capQrstPeroid'], # Cap peroid in days
+                        'type': res['itemServ'],
+                        'qty_used': res['qtyUsed'], # used quantity in number
+                        'qty_remain': res['qtyRemain'] # remaining quantity in number
                     }
-                    cap_data_list.append(cap_validation_response)
+                    self.env['insurance.capvalidation'].create(cap_validation_data)
+                    cap_data_list.append(cap_validation_data)
                 return cap_data_list      
             else:
                 _logger.info("No response from the IMIS Server")
