@@ -29,7 +29,6 @@ class InsuranceClaim(models.Model):
     ], string="State", default="draft")
     claim_uuid = fields.Text(string="Claim UUID")
     insurance_claim_line = fields.One2many('insurance.claim.line', 'claim_id', string="Insurance Claim Line")
-    sale_orders = fields.Many2many('sale.order', string="Sale Order")
     attachment_ids = fields.Many2many('ir.attachment', string="Attachments")
     external_visit_uuid = fields.Char(string="External Visit Id", help="This field is used to store visit id of a patient")
     partner_uuid = fields.Char(string="Customer UUID", store=True, readonly=True)
@@ -79,6 +78,7 @@ class InsuranceClaim(models.Model):
         }
         _logger.info("Claim:%s", claim)
         claim_in_db = self.env['insurance.claim'].search([('external_visit_uuid', '=', visit_uuid), ('care_setting', '=', 'ipd'), ('state', '=', 'draft')])
+        _logger.info("Existing IPD Claim Id:%s", claim_in_db)
         # Create a insurance claim
         if len(claim_in_db) == 0:
             _logger.info("*****Creating New Claim*****")
@@ -86,25 +86,40 @@ class InsuranceClaim(models.Model):
             _logger.info("Claim in db:%s", claim_in_db)
 
         # If care setting is "ipd" then adding new sales order
-        _logger.info("New Sale Order:%s", sale_order)
-        _logger.info("Updated Sale Order:%s", claim_in_db.sale_orders)
+        _logger.info("New Sale Order Id:%s", sale_order)
+        _logger.info("Old Sale Order Id:%s", claim_in_db.sale_orders)
 
         claim_in_db.update({
             'sale_orders': claim_in_db.sale_orders + sale_order
         })
-        _logger.info("New Calim with added sale order:%s", claim_in_db)
+        _logger.info("New Claim with added sale order:%s", claim_in_db)
 
         # Create a insurance claim line
         self._create_claim_line(claim_in_db, sale_order)
-    
+
+        insurance_claim_lines = self.env['insurance.claim.line'].search([
+            ('claim_id', '=', claim_in_db.id)
+        ])
+
+        _logger.info("Insurance Claim Line:%s", insurance_claim_lines)
+        
+        # Update 'insurance claim line' id in the insurance claim model
+        if insurance_claim_lines:
+            claim_in_db.update({
+                'insurance_claim_line': insurance_claim_lines
+            })
+        else:
+            _logger.info("No Claim Line Item Present")
+            raise ValidationError("No Claim Line Item Present")
+       
     def _create_claim_line(self, claim, sale_order):
-        _logger.info("Inside create claim line")
+        _logger.info("Inside _create_claim_line")
         insurance_sale_order_lines = sale_order.order_line.filtered(lambda l: l.payment_type == 'insurance')
         _logger.info("Insurance Sale Order Lines:%s", insurance_sale_order_lines)
 
         if not insurance_sale_order_lines:
             _logger.info("No sale order line found for insurance payment type")
-            pass
+            raise ValidationError("No sale order line found for insurance payment type")
         
         for sale_order_line in insurance_sale_order_lines:
             _logger.info("Inside insurance sale order line loop")
@@ -120,10 +135,21 @@ class InsuranceClaim(models.Model):
             if len(imis_mapped_row) > 1:
                 raise ValidationError("Multiple IMIS Mapping found for product:%s", sale_order_line.produt_id.name)
         
-            self.create_new_claim_line(claim, sale_order_line, imis_mapped_row)
+            #Check if a product is already present. If yes update the quantity.
+            insurance_claim_line = claim.insurance_claim_line.filtered(lambda r: r.imis_product_code == imis_mapped_row.item_code)
+            _logger.info("Insurance Claim Line:%s", insurance_claim_line)
+
+            if insurance_claim_line:
+                _logger.info("Insurance Claim Line Quantity:%s", insurance_claim_line.product_qty)
+                insurance_claim_line.update({
+                    'product_qty': insurance_claim_line.product_qty + sale_order_line.product_uom_qty
+                })
+                _logger.info("Insurance Claim Line After Adding Quantity:%s", insurance_claim_line.product_qty)
+            else:
+                self.create_new_claim_line(claim, sale_order_line, imis_mapped_row)
 
     def create_new_claim_line(self, claim, sale_order_line, imis_mapped_row):
-        _logger.info("Inside create new claim line")
+        _logger.info("Inside create_new_claim_line")
         claim_line_item = {
             'claim_id': claim.id,
             'product_id': sale_order_line.product_id.id,
