@@ -1,4 +1,4 @@
-from odoo import api, fields, models
+from odoo import api, fields, models, _
 from odoo.exceptions import UserError, ValidationError
 import base64
 import logging
@@ -8,17 +8,17 @@ class AccountMoveInherit(models.Model):
     _name = 'account.move'
     _inherit = 'account.move'
 
-    payment_type = fields.Selection(selection="_get_payment_type_data", string="Payment Type", related="order_id.payment_type", readonly=False)
+    move_payment_type = fields.Selection(string="Payment Type", related="order_id.payment_type", readonly=False)
 
-    @api.model
-    def _get_payment_type_data(self):
-        returnData = []
-        payment_type_ids = self.env['payment.types'].search([])
-        if payment_type_ids:
-            for pt in payment_type_ids:
-                data = payment_type_ids.browse(pt.id)
-                returnData.append((data.key, data.value))
-        return returnData
+    # @api.model
+    # def _get_payment_type_data(self):
+    #     returnData = []
+    #     payment_type_ids = self.env['payment.types'].search([])
+    #     if payment_type_ids:
+    #         for pt in payment_type_ids:
+    #             data = payment_type_ids.browse(pt.id)
+    #             returnData.append((data.key, data.value))
+    #     return returnData
 
     def action_generate_attachment(self, account_id, claim_id):
         _logger.info("Inside action_generate_attachment")

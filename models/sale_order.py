@@ -292,11 +292,11 @@ class SaleOrderInherit(models.Model):
         #     ('name', 'ilike', insurance_journal_name)
         # ])
         # _logger.info("Insurance Journal Account Id:%s", insurance_journal_id)
-
         for order in self:
             _logger.info("Sale Order Id:%s", order)
             self.action_invoice_create_commons(order)
 
+            
         return True
     
     def action_invoice_create_commons(self, order):
