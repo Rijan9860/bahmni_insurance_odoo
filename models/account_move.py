@@ -20,6 +20,33 @@ class AccountMoveInherit(models.Model):
     #             returnData.append((data.key, data.value))
     #     return returnData
 
+    def action_register_payment(self):
+        ''' Open the account.payment.register wizard to pay the selected journal entries.
+        :return: An action opening the account.payment.register wizard.
+        '''
+        for rec in self:
+            payment_type = rec.move_payment_type
+            if payment_type:
+                _logger.info("Payment Type:%s", payment_type)
+                journal_id = rec.env['payment.journal.mapping'].search([
+                    ('payment_type', '=', payment_type)
+                ]).journal_id.id
+                _logger.info("Journal Id:%s", journal_id)
+                if not journal_id:
+                    raise UserError("Please define a journal for this company")
+        return {
+            'name': _('Register Payment'),
+            'res_model': 'account.payment.register',
+            'view_mode': 'form',
+            'context': {
+                'active_model': 'account.move',
+                'active_ids': self.ids,
+                'default_journal_id': journal_id
+            },
+            'target': 'new',
+            'type': 'ir.actions.act_window',
+        }
+
     def action_generate_attachment(self, account_id, claim_id):
         _logger.info("Inside action_generate_attachment")
 

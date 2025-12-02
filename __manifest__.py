@@ -24,6 +24,7 @@
         'views/hib_config_settings_view.xml',
         'views/res_company_view.xml',
         'views/account_move_view.xml',
+        'views/account_payment_register_view.xml',
         'wizard/check_eligibility_response.xml'
         # 'views/stock_lot_view.xml'
     ],
