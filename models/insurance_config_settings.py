@@ -15,7 +15,11 @@ class InsuranceConfigSettings(models.TransientModel):
     openmrs_password = fields.Char(string="Password")
     openmrs_base_url = fields.Char(string="Base Url")
     insurance_journal = fields.Char(string="Insurance Journal")
-    
+    manually_setup_claim_code = fields.Boolean(string="Use default claim code", help="Use default claim code or set it up manually")
+    claim_code_start_range = fields.Integer(string="Start Range", help="start value for claim code")
+    claim_code_end_range = fields.Integer(string="End Range", help="End value for claim code")
+    claim_code_next_val = fields.Integer(string="Next Value")
+
     @api.model
     def get_values(self):
         res = super().get_values()
@@ -25,6 +29,10 @@ class InsuranceConfigSettings(models.TransientModel):
             password = param_obj.get_param('insurance.config.settings.password', default=''),
             base_url = param_obj.get_param('insurance.config.settings.base_url', default=''),
             insurance_journal = param_obj.get_param('insurance.config.settings.insurance_journal', default=''),
+            manually_setup_claim_code = param_obj.get_param('insurance.config.settings.manually_setup_claim_code', default=''),
+            claim_code_start_range = param_obj.get_param('insurance.config.settings.claim_code_start_range', default=''),
+            claim_code_end_range = param_obj.get_param('insurance.config.settings.claim_code_end_range', default=''),
+            claim_code_next_val = param_obj.get_param('insurance.config.settings.claim_code_next_val', default='')
         )
         return res
     
@@ -35,6 +43,10 @@ class InsuranceConfigSettings(models.TransientModel):
         param_obj.set_param('insurance.config.settings.password', self.password)
         param_obj.set_param('insurance.config.settings.base_url', self.base_url)
         param_obj.set_param('insurance.config.settings.insurance_journal', self.insurance_journal)
+        param_obj.set_param('insurance.config.settings.manually_setup_claim_code', self.manually_setup_claim_code)
+        param_obj.set_param('insurance.config.settings.claim_code_start_range', self.claim_code_start_range)
+        param_obj.set_param('insurance.config.settings.claim_code_end_range', self.claim_code_end_range)
+        param_obj.set_param('insurance.config.settings.claim_code_next_val', self.claim_code_next_val)
 
     def action_test_connection(self):
         _logger.info("Action Test Connection")
@@ -60,6 +72,22 @@ class InsuranceConfigSettings(models.TransientModel):
                     "target": "main",
                     "context": {"show_message": True}
                 } 
+    
+    def get_next_value(self):
+        _logger.info("Inside get_next_value")
+        param_obj = self.env['ir.config_parameter'].sudo()
+
+        next_value = param_obj.get_param('insurance.config.settings.claim_code_next_val')
+        _logger.info("Next Value = %s", next_value)
+
+        next_value = int(next_value)
+
+        next_value += 1
+
+        param_obj.set_param('insurance.config.settings.claim_code_next_val', next_value)
+        _logger.info("After update, next value = %s", next_value)
+
+        return next_value
 
 
     
