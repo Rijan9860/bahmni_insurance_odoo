@@ -73,6 +73,51 @@ class InsuranceConfigSettings(models.TransientModel):
                     "context": {"show_message": True}
                 } 
     
+    @api.constrains("claim_code_start_range")
+    def validate_claim_code_start_range(self):
+        '''
+            Skip Start Range validation if its not manual setup for claim code
+        '''
+        if not self.manually_setup_claim_code:
+            pass
+
+        if self.claim_code_start_range <= 0:
+            raise ValidationError("The Start Range can't be lesser than or equal to 0")
+        
+        if not self.claim_code_start_range:
+            raise ValidationError("The Start Range can't be empty")
+        
+    @api.constrains("claim_code_end_range")
+    def validate_claim_code_end_range(self):
+        '''
+            Skip End Range validation if its not manual setup for claim code
+        '''
+        if not self.manually_setup_claim_code:
+            pass
+
+        if not self.claim_code_end_range:
+            raise ValidationError("The End Range can't be empty")
+        
+        if self.claim_code_end_range < self.claim_code_start_range:
+            raise ValidationError("The End Range can't be smaller than Start Range")
+        
+    @api.constrains("claim_code_next_val")
+    def validate_claim_code_next_val(self):
+        '''
+            Skip Next Value validation if its not manual setup for claim code
+        '''
+        if not self.manually_setup_claim_code:
+            pass
+
+        if not self.claim_code_next_val:
+            raise ValidationError("The Next Value can't be empty") 
+
+        if self.claim_code_next_val < self.claim_code_start_range:
+            raise ValidationError("The Next Value can't be lesser than Start Range")
+        
+        if self.claim_code_next_val > self.claim_code_end_range:
+            raise ValidationError("The Next Value can't be greater than End Range")
+    
     def get_next_value(self):
         _logger.info("Inside get_next_value")
         param_obj = self.env['ir.config_parameter'].sudo()
