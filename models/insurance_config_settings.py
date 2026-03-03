@@ -19,6 +19,10 @@ class InsuranceConfigSettings(models.TransientModel):
     claim_code_start_range = fields.Integer(string="Start Range", help="start value for claim code")
     claim_code_end_range = fields.Integer(string="End Range", help="End value for claim code")
     claim_code_next_val = fields.Integer(string="Next Value")
+    manually_setup_ipd_number = fields.Boolean(string="Use default ipd number", help="Use default ipd number or set it up manually")
+    ipd_number_start_range = fields.Integer(string="Start Range", help="start value for ipd number")
+    ipd_number_end_range = fields.Integer(string="End Range", help="End value for ipd number")
+    ipd_number_next_val = fields.Integer(string="Next Value")
 
     @api.model
     def get_values(self):
@@ -32,7 +36,11 @@ class InsuranceConfigSettings(models.TransientModel):
             manually_setup_claim_code = param_obj.get_param('insurance.config.settings.manually_setup_claim_code', default=''),
             claim_code_start_range = param_obj.get_param('insurance.config.settings.claim_code_start_range', default=''),
             claim_code_end_range = param_obj.get_param('insurance.config.settings.claim_code_end_range', default=''),
-            claim_code_next_val = param_obj.get_param('insurance.config.settings.claim_code_next_val', default='')
+            claim_code_next_val = param_obj.get_param('insurance.config.settings.claim_code_next_val', default=''),
+            manually_setup_ipd_number = param_obj.get_param('insurance.config.settings.manually_setup_ipd_number', default=''),
+            ipd_number_start_range = param_obj.get_param('insurance.config.settings.ipd_number_start_range', default=''),
+            ipd_number_end_range = param_obj.get_param('insurance.config.settings.ipd_number_end_range', default=''),
+            ipd_number_next_val = param_obj.get_param('insurance.config.settings.ipd_number_next_val', default='')
         )
         return res
     
@@ -47,6 +55,10 @@ class InsuranceConfigSettings(models.TransientModel):
         param_obj.set_param('insurance.config.settings.claim_code_start_range', self.claim_code_start_range)
         param_obj.set_param('insurance.config.settings.claim_code_end_range', self.claim_code_end_range)
         param_obj.set_param('insurance.config.settings.claim_code_next_val', self.claim_code_next_val)
+        param_obj.set_param('insurance.config.settings.manually_setup_ipd_number', self.manually_setup_ipd_number)
+        param_obj.set_param('insurance.config.settings.ipd_number_start_range', self.ipd_number_start_range)
+        param_obj.set_param('insurance.config.settings.ipd_number_end_range', self.ipd_number_end_range)
+        param_obj.set_param('insurance.config.settings.ipd_number_next_val', self.ipd_number_next_val)
 
     def action_test_connection(self):
         _logger.info("Action Test Connection")
@@ -73,50 +85,53 @@ class InsuranceConfigSettings(models.TransientModel):
                     "context": {"show_message": True}
                 } 
     
-    @api.constrains("claim_code_start_range")
-    def validate_claim_code_start_range(self):
+    @api.constrains("manually_setup_claim_code", "claim_code_start_range", "manually_setup_ipd_number", "ipd_number_start_range")
+    def validate_start_range(self):
         '''
-            Skip Start Range validation if its not manual setup for claim code
+            Skip Start Range validation if its not manual setup for claim code or ipd number
         '''
-        if not self.manually_setup_claim_code:
-            pass
-
-        if self.claim_code_start_range <= 0:
-            raise ValidationError("The Start Range can't be lesser than or equal to 0")
+        for rec in self:
+            if rec.manually_setup_claim_code:
+                if rec.claim_code_start_range <= 0:
+                    raise ValidationError("The Claim Code Start Range can't be lesser than or equal to 0")
+                
+            if rec.manually_setup_ipd_number:
+                if rec.ipd_number_start_range <= 0:
+                    raise ValidationError("The IPD Number Start Range can't be lesser than or equal to 0")
+                
+    @api.constrains("manually_setup_claim_code", "claim_code_end_range", "manually_setup_ipd_number", "ipd_number_end_range")
+    def validate_end_range(self):
+        '''
+            Skip End Range validation if its not manual setup for claim code or ipd number
+        '''
+        for rec in self:
+            if rec.manually_setup_claim_code:
+                if rec.claim_code_end_range < rec.claim_code_start_range:
+                    raise ValidationError("The Claim Code End Range can't be smaller than Start Range")
+                
+            if rec.manually_setup_ipd_number:
+                if rec.ipd_number_end_range < rec.ipd_number_start_range:
+                    raise ValidationError("The IPD Number End Range can't be smaller than Start Range")
         
-        if not self.claim_code_start_range:
-            raise ValidationError("The Start Range can't be empty")
-        
-    @api.constrains("claim_code_end_range")
-    def validate_claim_code_end_range(self):
+    @api.constrains("manually_setup_claim_code", "claim_code_next_val", "manually_setup_ipd_number", "ipd_number_next_val")
+    def validate_next_val(self):
         '''
-            Skip End Range validation if its not manual setup for claim code
+            Skip Next Value validation if its not manual setup for claim code or IPD Number
         '''
-        if not self.manually_setup_claim_code:
-            pass
-
-        if not self.claim_code_end_range:
-            raise ValidationError("The End Range can't be empty")
-        
-        if self.claim_code_end_range < self.claim_code_start_range:
-            raise ValidationError("The End Range can't be smaller than Start Range")
-        
-    @api.constrains("claim_code_next_val")
-    def validate_claim_code_next_val(self):
-        '''
-            Skip Next Value validation if its not manual setup for claim code
-        '''
-        if not self.manually_setup_claim_code:
-            pass
-
-        if not self.claim_code_next_val:
-            raise ValidationError("The Next Value can't be empty") 
-
-        if self.claim_code_next_val < self.claim_code_start_range:
-            raise ValidationError("The Next Value can't be lesser than Start Range")
-        
-        if self.claim_code_next_val > self.claim_code_end_range:
-            raise ValidationError("The Next Value can't be greater than End Range")
+        for rec in self:
+            if rec.manually_setup_claim_code:
+                if rec.claim_code_next_val < rec.claim_code_start_range:
+                    raise ValidationError("The Claim Code Next Value can't be lesser than Start Range")
+                
+                if rec.claim_code_next_val > rec.claim_code_end_range:
+                    raise ValidationError("The Claim Code Next Value can't be greater than End Range")
+            
+            if rec.manually_setup_ipd_number:
+                if rec.ipd_number_next_val < rec.ipd_number_start_range:
+                    raise ValidationError("The IPD Number Next Value can't be lesser than Start Range")
+                
+                if rec.ipd_number_next_val > rec.ipd_number_end_range:
+                    raise ValidationError("The IPD Number Next Value can't be greater than End Range")
     
     def get_next_value(self):
         _logger.info("Inside get_next_value")
@@ -130,6 +145,22 @@ class InsuranceConfigSettings(models.TransientModel):
         next_value += 1
 
         param_obj.set_param('insurance.config.settings.claim_code_next_val', next_value)
+        _logger.info("After update, next value = %s", next_value)
+
+        return next_value
+    
+    def get_ipd_next_value(self):
+        _logger.info("Inside get_ipd_next_value")
+        param_obj = self.env['ir.config_parameter'].sudo()
+
+        next_value = param_obj.get_param('insurance.config.settings.ipd_number_next_val')
+        _logger.info("Next Value = %s", next_value)
+
+        next_value = int(next_value)
+
+        next_value += 1
+
+        param_obj.set_param('insurance.config.settings.ipd_number_next_val', next_value)
         _logger.info("After update, next value = %s", next_value)
 
         return next_value
