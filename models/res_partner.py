@@ -4,6 +4,13 @@ _logger = logging.getLogger(__name__)
 
 class ResPartner(models.Model):
     _inherit = 'res.partner'
+
+    birth_date = fields.Date(string="Date of Birth")
+    gender = fields.Selection([
+        ('M', 'Male'),
+        ('F', 'Female'),
+        ('O', 'Other')
+    ], string="Gender")
     
     def _get_nhis_number(self, partner_id):
         _logger.info("Inside Get Nhis Number. Partner Id:%s", partner_id)

@@ -26,6 +26,7 @@
         'views/account_move_view.xml',
         'views/account_payment_register_view.xml',
         'views/account_payment_view.xml',
+        'views/res_partner_view.xml',
         'wizard/check_eligibility_response.xml',
         'reports/report_action_book.xml',
         'reports/account_invoice_report.xml',
