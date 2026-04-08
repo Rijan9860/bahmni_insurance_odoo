@@ -8,14 +8,30 @@ class SaleOrderInherit(models.Model):
     _inherit = 'sale.order'
     _description = 'Inherit Sale Order Module'
 
-    nhis_number = fields.Char(string="NHIS Number")
-    insurance_status = fields.Boolean(string="Insurance Status", default=False)
+    nhis_number = fields.Char(string="NHIS Number", compute="_get_insurance_details")
+    insurance_status = fields.Boolean(string="Insurance Status", default=False, compute="_get_insurance_details")
     payment_type = fields.Selection(selection="_get_payment_type_data", string="Payment Type", default="cash")
     external_visit_uuid = fields.Char(string="External Id", help="This field is used to store visit ID of bahmni api call")
-    claim_id = fields.Char(string="Claim Id")
+    claim_id = fields.Char(string="Claim Id", compute="_get_insurance_details")
     partner_uuid = fields.Char(string="Customer UUID", store=True, readonly=True)
     is_apply_copayment_checked = fields.Integer(string="Is Apply Copayment Checked", store=True)
     
+    @api.onchange('partner_id')
+    def _get_insurance_details(self):
+        _logger.info("Inside _get_insurance_details")
+        for sale_order in self:
+            partner_id = sale_order.partner_id.id
+            _logger.info("Partner Id=%s",partner_id)
+            if partner_id:
+                nhis_number = self.env['res.partner']._get_nhis_number(partner_id)
+                insurance_status = self.env['res.partner']._get_nhis_status(partner_id)
+                claim_id = self.env['res.partner']._get_claim_id(partner_id)
+                sale_order.nhis_number = nhis_number
+                sale_order.insurance_status = insurance_status
+                sale_order.claim_id = claim_id
+                if sale_order.nhis_number:
+                    sale_order.payment_type = 'insurance'
+            
     @api.model
     def _get_payment_type_data(self):
         returnData = []

@@ -13,10 +13,28 @@ class ResPartner(models.Model):
     ], string="Gender")
     
     def _get_nhis_number(self, partner_id):
-        _logger.info("Inside Get Nhis Number. Partner Id:%s", partner_id)
+        _logger.info("Inside _get_nhis_number")
         attributes = self.env['res.partner.attributes'].search([
             ('partner_id', '=', partner_id),
             ('name', '=', 'NHIS Number')
+        ])
+        if attributes:
+            return attributes.value
+        
+    def _get_nhis_status(self, partner_id):
+        _logger.info("Inside _get_nhis_status")
+        attributes = self.env['res.partner.attributes'].search([
+            ('partner_id', '=', partner_id),
+            ('name', '=', 'NHIS Member Active')
+        ])
+        if attributes:
+            return attributes.value
+    
+    def _get_claim_id(self, partner_id):
+        _logger.info("Inside _get_claim_id")
+        attributes = self.env['res.partner.attributes'].search([
+            ('partner_id', '=', partner_id),
+            ('name', '=', 'Claim Code')
         ])
         if attributes:
             return attributes.value
