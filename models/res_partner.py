@@ -11,6 +11,15 @@ class ResPartner(models.Model):
         ('F', 'Female'),
         ('O', 'Other')
     ], string="Gender")
+
+    def name_get(self):
+        res = []
+        for partner in self:
+            name = partner.name or ''
+            if partner.ref:
+                name += ' [' + partner.ref + ']'
+            res.append((partner.id, name))
+        return res
     
     def _get_nhis_number(self, partner_id):
         _logger.info("Inside _get_nhis_number")
