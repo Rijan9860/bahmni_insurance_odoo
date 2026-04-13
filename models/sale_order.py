@@ -25,9 +25,13 @@ class SaleOrderInherit(models.Model):
             if partner_id:
                 nhis_number = self.env['res.partner']._get_nhis_number(partner_id)
                 insurance_status = self.env['res.partner']._get_nhis_status(partner_id)
+                _logger.info("Insurance Status=%s", insurance_status)                   
                 claim_id = self.env['res.partner']._get_claim_id(partner_id)
                 sale_order.nhis_number = nhis_number
-                sale_order.insurance_status = insurance_status
+                if insurance_status == 'true':
+                    sale_order.insurance_status = True
+                else:
+                    sale_order.insurance_status = False
                 sale_order.claim_id = claim_id
                 if sale_order.nhis_number:
                     sale_order.payment_type = 'insurance'
