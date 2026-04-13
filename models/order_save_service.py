@@ -7,7 +7,7 @@ class OrderSaveService(models.Model):
     _name = 'order.save.service'
     _inherit = 'order.save.service'
 
-    def getInsuranceCost(self, product_id):
+    def _get_insurance_cost(self, product_id):
         map_id = self.env['insurance.odoo.product.map'].search([
             ('odoo_product_id', '=', product_id)
         ], limit=10)
@@ -61,7 +61,7 @@ class OrderSaveService(models.Model):
             for sale_order_line in sale_order_lines_in_db:
                 if payment_type == 'insurance':
                     product_id = sale_order_line.product_id.id
-                    insurance_cost = self.getInsuranceCost(product_id)
+                    insurance_cost = self._get_insurance_cost(product_id)
                     _logger.info("Insurance Cost=%s", insurance_cost)
                     sale_order_line.update({
                         'payment_type': payment_type,

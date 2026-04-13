@@ -45,51 +45,78 @@ class SaleOrderInherit(models.Model):
                 data = payment_type_ids.browse(pt.id)
                 returnData.append((data.key, data.value))
         return returnData
+    
+    def _get_insurance_cost(self, product_id):
+        _logger.info("Inside _get_insurance_cost")
+        _logger.info("Product Id=%s", product_id)
+        map_id = self.env['insurance.odoo.product.map'].search([
+            ('odoo_product_id', '=', product_id)
+        ])
+        _logger.info("Map Id=%s", map_id) 
+        if len(map_id) == 0:
+            return 1777.17
+        else:
+            map_id[0].insurance_product_price 
 
     @api.onchange('payment_type')
     def _change_payment_type(self):
+        _logger.info("Inside _change_payment_type")
+        has_error = False
+        error_products = ""
+        counter = 1
         for sale_order in self:
-            if sale_order.payment_type == "cash":
-                if sale_order.discount_type == "percentage" or sale_order.discount_type == "fixed":
-                    _logger.info(f"Payment Type: {sale_order.payment_type}")
+            shop_id = sale_order.shop_id.id
+            if shop_id == 1:
+                if sale_order.payment_type == "cash":
+                    sale_order.discount_type == 'percentage'
+                    sale_order.discount_percentage = 0.0
                     discount_head_id = sale_order.env['account.account'].search([
                         ('code', '=', 450000)
                     ]).id
-                    if discount_head_id:
-                        sale_order.disc_acc_id = discount_head_id
-                    else:
-                        raise UserError("Discount head not found!!")
-                for sale_order_line in sale_order.order_line:
-                    product_template = sale_order.env['product.template'].search([
-                        ('id', '=', sale_order_line.product_template_id.id)
-                    ])
-                    if product_template:
-                        sale_order_line.price_unit = product_template.list_price
-                    else:
-                        raise UserError("Product Not Mapped!! Please Contact Admin.")
-            elif sale_order.payment_type == "insurance":
-                if sale_order.discount_type == "percentage" or sale_order.discount_type == "fixed":
-                    _logger.info(f"Payment Type: {sale_order.payment_type}")
-                    discount_head_id = sale_order.env['account.account'].search([
-                        ('code', '=', '101105')
-                    ])
-                    if discount_head_id:
-                        sale_order.disc_acc_id = discount_head_id
-                    else:
-                        raise UserError("Discount head not found!!")
-                for sale_order_line in sale_order.order_line:
-                    if sale_order_line.product_template_id:
-                        _logger.info("Product Template Id---->%s", sale_order_line.product_template_id) 
-                        insurance_odoo = self.env['insurance.odoo.product.map'].search([
-                            ('odoo_product_id', '=', sale_order_line.product_template_id.id)
-                        ]) 
-                        if insurance_odoo:
-                            sale_order_line.price_unit = insurance_odoo.insurance_product_price 
-                        else:
-                            raise UserError("Product Not Mapped!! Please Contact Admin.")
+                    sale_order.disc_acc_id = discount_head_id
+                else:
+                    sale_order.discount_type = 'none'
             else:
-                pass
+                sale_order.discount_type = 'none'
 
+            for sale_order_line in sale_order.order_line:
+                product_id = sale_order_line.product_id
+                if sale_order.payment_type == "insurance":
+                    if self.nhis_number:
+                        insurance_cost = self._get_insurance_cost(product_id.id)
+                        if insurance_cost == 1777.17:
+                            has_error = True
+                            if product_id.name not in error_products:
+                                error_products += error_products + "\n" + str(counter) + ". " + str(product_id.name)
+                                counter += 1
+                            sale_order_line.update({
+                                'payment_type': sale_order.payment_type,
+                            })
+                        else:
+                            sale_order_line.update({
+                                'payment_type': sale_order.payment_type,
+                                'price_unit': insurance_cost
+                            })
+                    else:
+                        sale_order.payment_type = 'cash'
+                        return {
+                            'warning': {
+                            'title': 'Warning !!',
+                            'message': 'Payment type \'Insurance\' can be selected only for patient with the valid insurance id',
+                        }}
+                else:
+                    sale_order_line.update({
+                        'payment_type': sale_order.payment_type,
+                        'price_unit': product_id.lst_price
+                    })
+        if has_error == True:
+            return {
+                'warning': {
+                    'title': 'Warning !!',
+                    'message': 'All product in the list are not available for insurance claim. Please contact admin.\nProducts are :\n' + str(error_products) 
+                }
+            }
+                            
     def cap_validation(self):
         _logger.info("Cap Validation")
         for rec in self:
