@@ -75,16 +75,11 @@ class OrderSaveService(models.Model):
                     discount_head_id = sale_order.env['account.account'].search([
                         ('code', '=', 450000)
                     ]).id
-                    discounted_amount = sale_order.amount_untaxed * (discounted_percentage/100)
-                    amount_total_new = sale_order.amount_untaxed - discounted_amount
-
                     if sale_order.shop_id.id == 1:
                         sale_order.update({
                             'discount_type': 'percentage',
-                            'discount_percentage': discounted_percentage,
-                            'disc_acc_id': discount_head_id,
-                            'discount': discounted_amount,
-                            'amount_total': amount_total_new
+                            'discount_percentage':discounted_percentage,
+                            'disc_acc_id': discount_head_id
                         })
 
                     

@@ -33,8 +33,6 @@ class SaleOrderInherit(models.Model):
                 else:
                     sale_order.insurance_status = False
                 sale_order.claim_id = claim_id
-                if sale_order.nhis_number:
-                    sale_order.payment_type = 'insurance'
 
     @api.onchange('shop_id')
     def add_discount_for_pharmacy(self):
@@ -74,7 +72,7 @@ class SaleOrderInherit(models.Model):
         if len(map_id) == 0:
             return 1777.17
         else:
-            map_id[0].insurance_product_price 
+            return map_id[0].insurance_product_price 
 
     @api.onchange('payment_type')
     def _change_payment_type(self):
