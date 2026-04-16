@@ -35,6 +35,24 @@ class SaleOrderInherit(models.Model):
                 sale_order.claim_id = claim_id
                 if sale_order.nhis_number:
                     sale_order.payment_type = 'insurance'
+
+    @api.onchange('shop_id')
+    def add_discount_for_pharmacy(self):
+        _logger.info("Inside add_discount_for_pharmacy")
+        for sale_order in self:
+            shop_id = sale_order.shop_id.id
+            if shop_id == 1:
+                if sale_order.payment_type == "cash":
+                    sale_order.discount_type = 'percentage'
+                    sale_order.discount_percentage = 0.0
+                    discount_head_id = sale_order.env['account.account'].search([
+                        ('code', '=', 450000)
+                    ]).id
+                    sale_order.disc_acc_id = discount_head_id
+                else:
+                    sale_order.discount_type = 'none'
+            else:
+                sale_order.discount_type = 'none'
             
     @api.model
     def _get_payment_type_data(self):
