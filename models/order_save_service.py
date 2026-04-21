@@ -58,6 +58,7 @@ class OrderSaveService(models.Model):
                 'external_visit_uuid': visit_uuid,
                 'payment_type': payment_type
             })
+            
             for sale_order_line in sale_order_lines_in_db:
                 if payment_type == 'insurance':
                     product_id = sale_order_line.product_id.id

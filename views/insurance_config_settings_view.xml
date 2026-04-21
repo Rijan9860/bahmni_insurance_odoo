@@ -25,6 +25,7 @@
                     <div>
                         <button name="action_test_connection" type="object" class="oe_highlight" string="Test Connection" />
                     </div>
+                    <separator string="OpenMRS Connect Configuration" style="font-size: 16px"/>
                     <group string="OpenMRS Credentials" style="font-size: 14px;">
                         <group>
                             <field name="openmrs_username"/>

@@ -16,7 +16,8 @@ class InsuranceClaim(models.Model):
     nmc_number = fields.Char(string="NMC Number")
     care_setting = fields.Selection([
         ('opd', 'OPD'),
-        ('ipd', 'IPD')
+        ('ipd', 'IPD'),
+        ('emergency', 'Emergency')
     ])
     state = fields.Selection([
         ('draft', 'Draft'),

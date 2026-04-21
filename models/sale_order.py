@@ -1,6 +1,7 @@
 from odoo import api, models, fields, _
 from odoo.exceptions import ValidationError, UserError
 import odoo.addons.decimal_precision as dp
+import requests
 import logging
 _logger = logging.getLogger(__name__)
 
@@ -15,6 +16,7 @@ class SaleOrderInherit(models.Model):
     claim_id = fields.Char(string="Claim Id", compute="_get_insurance_details")
     partner_uuid = fields.Char(string="Customer UUID", store=True, readonly=True)
     is_apply_copayment_checked = fields.Integer(string="Is Apply Copayment Checked", store=True)
+    visit_type = fields.Char(string="Visit Type", store=True)
     
     @api.onchange('partner_id')
     def _get_insurance_details(self):
@@ -167,17 +169,30 @@ class SaleOrderInherit(models.Model):
                                 line.insurance_remain_qty = imis_mapped_row.capping_number
                     else:
                         _logger.info(f"No Product Mapping Found For {line.product_id}")
-                else:
-                    _logger.info("No product added in the sale order line")
 
     def check_eligibility(self):
         _logger.info("Check Eligibility")
+        visit_data = self._get_visit_data()
+        _logger.info("Visit Data=%s", visit_data)
+        if visit_data:
+            self.external_visit_uuid = visit_data.get('uuid')
+            visit_type = visit_data.get("visitType").lower()
+            self.visit_type = visit_type
+            _logger.info("Visit Type=%s", self.visit_type)
+            if self.visit_type == 'opd' or self.visit_type == 'emergency':
+                self.care_setting = 'opd'
+            else:
+                self.care_setting = 'ipd'
+            _logger.info("Care Setting=%s", self.care_setting)
+        else:
+            _logger.info("No Visit Data")
         self.cap_validation()
-        for rec in self:
-            if rec.company_id.copayment == "yes":
-                self.is_apply_copayment_checked = 1
-                if rec.nhis_number:
-                    partner_id = rec.partner_id
+        
+        if self.company_id.copayment == "yes":
+            self.is_apply_copayment_checked = 1
+            if self.nhis_number:
+                if self.visit_type not in ["emergency"]:
+                    partner_id = self.partner_id
                     _logger.info("Partner Id:%s", partner_id)
                     elig_response = self.env['insurance.eligibility'].get_insurance_details(partner_id)
                     _logger.info("Eligibilty Response:%s", elig_response)
@@ -208,13 +223,57 @@ class SaleOrderInherit(models.Model):
                         'target': 'new'
                     }
                 else:
-                    _logger.info("No NHIS number")
-                    raise UserError("No Insuree Id, Please update and retry !")   
+                    _logger.info(f"Copayment Not Allowed For Visit Type:{self.visit_type}")
             else:
-                company_name = rec.company_id.name
-                _logger.info(f"Copayment Not Applied for {company_name}")
-                raise UserError("Copayment Not Applied for %s", company_name)
+                _logger.info("No NHIS number")
+                raise UserError("No Insuree Id, Please update and retry !")   
+        else:
+            company_name = self.company_id.name
+            _logger.info(f"Copayment Not Applied for {company_name}")
+            raise UserError("Copayment Not Applied for %s", company_name)
             
+    def _get_visit_data(self):
+        _logger.info("Inside _get_visit_data")
+        openmrs_connect_configurations = self.env['insurance.config.settings'].get_values()
+        _logger.info("Openmrs Configuration=%s", openmrs_connect_configurations)
+        if not openmrs_connect_configurations:
+            raise UserError("OpenMRS Configuration Not Set!!")
+        
+        insurance_connect = self.env['insurance.connect']
+        
+        if self.payment_type not in ['cash']:
+            partner_uuid = self.partner_id.uuid
+            url = insurance_connect.prepare_openmrs_url("/openmrs/ws/rest/v1/visit?includeInactive=false&patient={}".format(partner_uuid), openmrs_connect_configurations)
+            _logger.info("Url=%s", url)
+
+            custom_headers = {
+                'Content-Type': 'application/json'
+            }
+            headers = insurance_connect.get_openmrs_header(openmrs_connect_configurations)
+            custom_headers.update(headers)
+            response = requests.get(url, headers=custom_headers, verify=False)
+            _logger.info("Response=%s", response)
+
+            if response.status_code == 200:
+                resp = response.json()
+                _logger.info("Resp=%s", resp)
+                visit_uuid = response.json()["results"][0]["uuid"]
+                _logger.info("Visit Uuid=%s", visit_uuid)
+                visit_url = insurance_connect.prepare_openmrs_url("/openmrs/ws/rest/v1/bahmnicore/visit/summary?visitUuid={}".format(visit_uuid), openmrs_connect_configurations)
+                _logger.info("Visit Url=%s", visit_url)
+                custom_headers = {
+                    'Content-Type': 'application/json'
+                }
+                headers = insurance_connect.get_openmrs_header(openmrs_connect_configurations)
+                custom_headers.update(headers)
+                visit_response = requests.get(visit_url, headers=custom_headers, verify=False)
+                if visit_response.status_code == 200:
+                    visit_data = visit_response.json()
+                    return visit_data
+            elif response.status_code == 401:
+                _logger.info("Please Check Credentials for Openmrs Connect Configuration and Try Again")
+                raise UserError("Please Check Credentials for Openmrs Connect Configuration and Try Again")
+
     def action_confirm(self):
         _logger.info("#####Action Confrim Inherit#####")
         """ Confirm the given quotation(s) and set their confirmation date.

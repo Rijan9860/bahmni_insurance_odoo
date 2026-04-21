@@ -98,7 +98,12 @@ class InsuranceConnect(models.TransientModel):
     
     def prepare_url(self, end_point, insurance_connect_configurations):
         return insurance_connect_configurations['base_url'] + end_point
+    
+    def prepare_openmrs_url(self, end_point, openmrs_connect_configurations):
+        return openmrs_connect_configurations['openmrs_base_url'] + end_point
 
     def get_header(self, insurance_connect_configurations):
         return urllib3.util.make_headers(basic_auth="%s:%s"%(insurance_connect_configurations['username'], insurance_connect_configurations['password']))
     
+    def get_openmrs_header(self, openmrs_connect_configurations):
+        return urllib3.util.make_headers(basic_auth="%s:%s"%(openmrs_connect_configurations['openmrs_username'], openmrs_connect_configurations['openmrs_password']))

@@ -32,6 +32,9 @@ class InsuranceConfigSettings(models.TransientModel):
             username = param_obj.get_param('insurance.config.settings.username', default=''),
             password = param_obj.get_param('insurance.config.settings.password', default=''),
             base_url = param_obj.get_param('insurance.config.settings.base_url', default=''),
+            openmrs_username = param_obj.get_param('insurance.config.settings.openmrs_username', default=''),
+            openmrs_password = param_obj.get_param('insurance.config.settings.openmrs_password', default=''),
+            openmrs_base_url = param_obj.get_param('insurance.config.settings.openmrs_base_url', default=''),
             insurance_journal = param_obj.get_param('insurance.config.settings.insurance_journal', default=''),
             manually_setup_claim_code = param_obj.get_param('insurance.config.settings.manually_setup_claim_code', default=''),
             claim_code_start_range = param_obj.get_param('insurance.config.settings.claim_code_start_range', default=''),
@@ -44,12 +47,16 @@ class InsuranceConfigSettings(models.TransientModel):
         )
         return res
     
+    @api.model
     def set_values(self):
         super().set_values()
         param_obj = self.env['ir.config_parameter'].sudo()
         param_obj.set_param('insurance.config.settings.username', self.username)
         param_obj.set_param('insurance.config.settings.password', self.password)
         param_obj.set_param('insurance.config.settings.base_url', self.base_url)
+        param_obj.set_param('insurance.config.settings.openmrs_username', self.openmrs_username)
+        param_obj.set_param('insurance.config.settings.openmrs_password', self.openmrs_password)
+        param_obj.set_param('insurance.config.settings.openmrs_base_url', self.openmrs_base_url)
         param_obj.set_param('insurance.config.settings.insurance_journal', self.insurance_journal)
         param_obj.set_param('insurance.config.settings.manually_setup_claim_code', self.manually_setup_claim_code)
         param_obj.set_param('insurance.config.settings.claim_code_start_range', self.claim_code_start_range)
