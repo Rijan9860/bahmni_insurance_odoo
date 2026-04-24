@@ -19,7 +19,7 @@ class OrderSaveService(models.Model):
             
     @api.model
     def create_orders(self, vals):
-        _logger.info("Inside override create_orders")
+        _logger.info("Inside overridden create_orders")
         all_orders = super(OrderSaveService, self)._get_openerp_orders(vals)
         _logger.info("All Orders=%s", all_orders)
         if not all_orders:

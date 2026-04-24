@@ -39,7 +39,7 @@ class InsuranceClaim(models.Model):
     icd_code = fields.Many2many('insurance.disease.code', string="Diagnosis", store=True)
 
     def _create_claim(self, sale_order):
-        _logger.info("Inside Create Claim overwritten")
+        _logger.info("Inside _create_claim")
         _logger.info("Sale Order Id:%s", sale_order)
         if sale_order and sale_order.payment_type in 'insurance':
             if not sale_order.nhis_number:

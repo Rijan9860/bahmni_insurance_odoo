@@ -1,6 +1,8 @@
 from odoo import api, models, fields, _
-from odoo.exceptions import ValidationError, UserError
+from odoo.exceptions import ValidationError, UserError, AccessError
 import odoo.addons.decimal_precision as dp
+from itertools import groupby
+from odoo.fields import Command
 import requests
 import logging
 _logger = logging.getLogger(__name__)
@@ -186,6 +188,7 @@ class SaleOrderInherit(models.Model):
             _logger.info("Care Setting=%s", self.care_setting)
         else:
             _logger.info("No Visit Data")
+        
         self.cap_validation()
         
         if self.company_id.copayment == "yes":
@@ -275,7 +278,7 @@ class SaleOrderInherit(models.Model):
                 raise UserError("Please Check Credentials for Openmrs Connect Configuration and Try Again")
 
     def action_confirm(self):
-        _logger.info("#####Action Confrim Inherit#####")
+        _logger.info("Inside overridden action_confirm")
         """ Confirm the given quotation(s) and set their confirmation date.
 
         If the corresponding setting is enabled, also locks the Sale Order.
@@ -404,92 +407,139 @@ class SaleOrderInherit(models.Model):
         if self[:1].create_uid.has_group('sale.group_auto_done_setting'):
             # Public user can confirm SO, so we check the group on any record creator.
             self.action_done()
+        
+        for line in self.order_line:
+            if line.display_type in ('line_section', 'line_note'):
+               continue
+            if line.product_uom_qty <=0:
+               raise UserError("Quantity for %s is %s. Please update the quantity or remove the product line."%(line.product_id.name,line.product_uom_qty))
+            if line.product_id.tracking == 'lot' and not line.lot_id:
+               raise UserError("Kindly choose batch no for %s to proceed further."%(line.product_id.name))
+            if 1 < self.order_line.search_count([('lot_id', '=', line.lot_id.id),('order_id', '=', self.id)]) and line.lot_id:
+              raise UserError("%s Duplicate batch no is not allowed. Kindly change the batch no to proceed further."%(line.lot_id.name))
+            if line.product_uom_qty > line.lot_id.product_qty and line.lot_id:
+              raise UserError("Insufficient batch(%s) quantity for %s and available quantity is %s"\
+                            %(line.lot_id.name, line.product_id.name, line.lot_id.product_qty))
+        
+        self.validate_delivery()
 
-        # Getting Id for Insurance Journal
-        # insurance_connect_configurations = self.env['insurance.config.settings'].get_values()
-        # _logger.info("Insurance Connect Configurations:%s", insurance_connect_configurations)
-        # insurance_journal_name = insurance_connect_configurations['insurance_journal']
-        # _logger.info("Insurance Journal Name:%s", insurance_journal_name)
-        # insurance_journal_id = self.env['account.account'].search([
-        #     ('name', 'ilike', insurance_journal_name)
-        # ])
-        # _logger.info("Insurance Journal Account Id:%s", insurance_journal_id)
-        for rec in self:
-            _logger.info("Sale Order Id:%s", rec)
-            payment_type = rec.payment_type
+        for order in self:
+            warehouse = order.warehouse_id
+            if order.picking_ids and bool(self.env['ir.config_parameter'].sudo().get_param('bahmni_sale.is_delivery_automated')):
+                for picking in self.picking_ids:
+                    picking.immediate_transfer = True
+                    for move in picking.move_ids:
+                        move.quantity_done = move.product_uom_qty
+                    picking._autoconfirm_picking()
+                    picking.action_set_quantities_to_reservation()
+                    picking.action_confirm()
+                    for move_line in picking.move_ids_without_package:
+                        move_line.quantity_done = move_line.product_uom_qty
+                    picking._action_done()
+                    for mv_line in picking.move_ids.mapped('move_line_ids'):
+                        if not mv_line.qty_done and mv_line.reserved_qty or mv_line.reserved_uom_qty:
+                            mv_line.qty_done = mv_line.reserved_qty or mv_line.reserved_uom_qty
+
+        payment_type = self.payment_type
+        if payment_type == 'cash':
+            journal_id = self.env['account.journal'].search([('name', '=', 'Cash')]).id
+        elif payment_type == 'insurance':
+            journal_id = self.env['account.journal'].search([('name', '=', 'Bank')]).id
+        
+        if bool(self.env['ir.config_parameter'].sudo().get_param('bahmni_sale.is_invoice_automated')):
+            create_invoices = self._create_invoices()
+            _logger.info("****Created Invoices*****")
+            _logger.info("Account Invoice Id:%s", create_invoices)
+            self.action_invoice_create_commons(self)
+            
+            if self.env.user.has_group('bahmni_sale.group_redirect_to_payments_on_sale_confirm'):
+                _logger.info("Inside bahmni_sale.group_redirect_to_payments_on_sale_confirm")
+                action = {
+                    'name': _('Payments'),
+                    'type': 'ir.actions.act_window',
+                    'res_model': 'account.payment.register',
+                    'context': {
+                        'active_model': 'account.move',
+                        'active_ids': create_invoices.ids,
+                        'default_journal_id': journal_id,
+                    },
+                    'view_mode': 'form',
+                    'target': 'new'
+                }
+                _logger.info("Action:%s", action)
+                return action
+        return True
+    
+    def _prepare_invoice(self):
+        _logger.info("Inside overridden _prepare_invoice")
+        self.ensure_one()
+        
+        amount_total = self.amount_untaxed + self.amount_tax
+        if self.discount_percentage:
+            tot_discount = amount_total * self.discount_percentage / 100
+        else:
+            tot_discount = self.discount
+
+        '''
+            Check payment type
+            If payment type is cash then default journal i.e. cash
+            If payment type is insurance then use insurance journal
+        '''
+      
+        if self.payment_type != 'partial':
+            payment_type = self.payment_type
             if payment_type:
                 _logger.info("Payment Type:%s", payment_type)
-                journal_id = rec.env['payment.journal.mapping'].search([
+                journal_id = self.env['payment.journal.mapping'].search([
                     ('payment_type', '=', payment_type)
-                ]).journal_id.id
+                ], limit=1).journal_id.id
                 _logger.info("Journal Id:%s", journal_id)
 
                 if not journal_id:
                     raise UserError("Please define a journal for this company")
-            else:
-                raise UserError("Please add a payment type")
+        else:
+            raise UserError("Please add a payment type")
+            
+        invoice_vals = (self._prepare_invoice_commons(tot_discount, journal_id, payment_type))
+        _logger.debug("Invoice Vals:%s", invoice_vals)
+        return invoice_vals
 
-            if bool(rec.env['ir.config_parameter'].sudo().get_param('bahmni_sale.is_invoice_automated')):
-                create_invoices = rec._create_invoices()
-                _logger.info("****Created Invoices*****")
-                _logger.info("Account Invoice Id:%s", create_invoices)
-                self.action_invoice_create_commons(rec)
-                
-                """Pass lot/serial number value from sale order to stock picking model"""
-                for sale_order in self:
-                    pickings = sale_order.picking_ids.filtered(
-                        lambda p: p.picking_type_code == "outgoing" and p.state not in ['done', 'cancel']
-                    )
-                    _logger.info("Picking Id:%s", pickings)
+    def _prepare_invoice_commons(self, tot_discount, journal_id, payment_type):
+        _logger.info("Inside _prepare_invoice_commons")
+        invoice_vals = {
+            'ref': self.client_order_ref or '',
+            'move_type': 'out_invoice',
+            'partner_id': self.partner_invoice_id.id,
+            'partner_shipping_id': self.partner_shipping_id.id,
+            'currency_id': self.pricelist_id.currency_id.id,
+            'narration': self.note,
+            'invoice_payment_term_id': self.payment_term_id.id,
+            'fiscal_position_id': self.fiscal_position_id.id or self.partner_invoice_id.property_account_position_id.id,
+            'company_id': self.company_id.id,
+            'user_id': self.user_id and self.user_id.id,
+            'team_id': self.team_id.id,
+            'invoice_line_ids': [],
+            'invoice_origin': self.name,
+            'payment_reference': self.reference,
+            'discount_type': self.discount_type,
+            'discount_percentage': self.discount_percentage,
+            'disc_acc_id': self.disc_acc_id.id,
+            'discount': tot_discount,
+            'round_off_amount': self.round_off_amount,
+            'order_id': self.id,
+            'amount_total': self.amount_total,
+            'journal_id': journal_id,
+            'move_payment_type': payment_type,
+            'nhis_number': self.nhis_number,
+            'claim_id': self.claim_id 
+        }
+        return invoice_vals
 
-                    for picking in pickings: #stock.picking
-                        for move in picking.move_ids_without_package: #stock.move
-                            for ml in move.move_line_ids: #stock.move.line
-                                sale_line = sale_order.order_line.filtered(lambda l: l.product_id == move.product_id and l.lot_id == ml.lot_id)
-                                if not sale_line:
-                                    _logger.warning("No matching sale line found for product %s in %s", move.product_id.display_name, sale_order.name)
-                                    continue
-                        
-                                matched_line = sale_line[0]
-                                _logger.info("Matched Line:%s", matched_line)
-                                ml.qty_done = matched_line.product_uom_qty
-                                _logger.info("Updated qty done=%s for product:%s lot:%s", ml.qty_done, move.product_id.display_name, ml.lot_id.display_name)
-
-                        # Validate the picking once all moves are updated
-                        picking.button_validate()
-                        _logger.info("Picking %s validated for Sale Order %s", picking.name, sale_order.name)
-
-                if rec.env.user.has_group('bahmni_sale.group_redirect_to_payments_on_sale_confirm'):
-                    _logger.info("Inside bahmni_sale.group_redirect_to_payments_on_sale_confirm")
-                    action = {
-                        'name': _('Payments'),
-                        'type': 'ir.actions.act_window',
-                        'res_model': 'account.payment.register',
-                        'context': {
-                            'active_model': 'account.move',
-                            'active_ids': create_invoices.id,
-                            'default_journal_id': journal_id,
-                        },
-                        'view_mode': 'form',
-                        'target': 'new'
-                    }
-                    _logger.info("Action:%s", action)
-                    return action
-        return True
-    
     def action_invoice_create_commons(self, order):
-        _logger.info("Inside action invoice create commons overwritten")
+        _logger.info("Inside action_invoice_create_commons")
         for order in self:
             _logger.info("Sale Order Id:%s", order)
             self.env['insurance.claim']._create_claim(order)
-
-    def _prepare_invoice(self):
-        _logger.info("Inside _prepare_invoice")
-        res = super(SaleOrderInherit, self)._prepare_invoice()
-        res['nhis_number'] = self.nhis_number
-        res['claim_id'] = self.claim_id
-        return res
-
 class SaleOrderLineInherit(models.Model):
     _inherit = 'sale.order.line'
     _description = 'Sale Order Line Inherit'
