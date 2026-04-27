@@ -51,6 +51,7 @@
                                     <field name="diagnosis" />
                                 </tree>
                             </field>
+                            <button name="action_retrieve_diagnosis" string="Retrieve Diagnosis" type="object" class="btn-primary"/>
                         </page>
                     </notebook>
                 </sheet>

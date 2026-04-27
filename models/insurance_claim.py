@@ -1,5 +1,6 @@
 from odoo import api, models, fields
-from odoo.exceptions import ValidationError
+from odoo.exceptions import ValidationError, UserError
+import requests
 import logging
 _logger = logging.getLogger(__name__)
 
@@ -179,6 +180,58 @@ class InsuranceClaim(models.Model):
 
         claim_line_in_db = self.env['insurance.claim.line'].create(claim_line_item)
         _logger.info("Claim Line in DB:%s", claim_line_in_db)
+
+    def action_retrieve_diagnosis(self):
+        openmrs_connect_configurations = self.env['insurance.config.settings'].get_values()
+        _logger.info("Openmrs Configuration=%s", openmrs_connect_configurations)
+        if not openmrs_connect_configurations:
+            raise UserError("OpenMRS Configuration Not Set!!")
+        
+        insurance_connect = self.env['insurance.connect']
+
+        partner_uuid = self.partner_uuid
+        _logger.info("Partner Uuid=%s", partner_uuid)
+        external_visit_uuid = self.external_visit_uuid
+        _logger.info("External Visit Uuid=%s", external_visit_uuid)
+
+        url = insurance_connect.prepare_openmrs_url("/openmrs/ws/rest/v1/bahmnicore/diagnosis/search?patientUuid={}&visitUuid={}".format(partner_uuid, external_visit_uuid), openmrs_connect_configurations)
+        _logger.info("URL=%s", url)
+        custom_headers = {
+            'Content-Type': 'application/json'
+        }
+        headers = insurance_connect.get_openmrs_header(openmrs_connect_configurations)
+        custom_headers.update(headers)
+        response = requests.get(url, headers=custom_headers, verify=False)
+        _logger.info("Response=%s", response)
+
+        if response.status_code == 200:
+            resp = response.json()
+            _logger.info("Resp=%s", resp)
+
+            icd_codes_to_add = []
+
+            for diagnosis in resp:
+                mappings = diagnosis.get("codedAnswer", {}).get("mappings", [])
+                for mapping in mappings:
+                    if mapping.get("source") == 'ICD-11-WHO':
+                        name = mapping.get("name")
+                        code = mapping.get("code")
+                        _logger.info("Name=%s", name)
+                        _logger.info("Code=%s", code)
+
+                        # search or create ICD code record
+                        insurance_disease_code = self.env['insurance.disease.code'].search([('icd_code', '=', code)], limit=1)
+                        _logger.info("Insurance Disease Code=%s", insurance_disease_code)
+
+                        if not insurance_disease_code:
+                            insurance_disease_code = self.env['insurance.disease.code'].create({
+                                'diagnosis': name,
+                                'icd_code': code
+                            })
+                        icd_codes_to_add.append(insurance_disease_code.id)
+            # Update the many2many field
+            if icd_codes_to_add:
+                self.icd_code = [(4, icd_id) for icd_id in icd_codes_to_add]
             
 class InsuranceClaimLine(models.Model):
     _name = 'insurance.claim.line'
