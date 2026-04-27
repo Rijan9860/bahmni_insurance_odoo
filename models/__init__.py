@@ -15,3 +15,4 @@ from . import account_move
 from . import account_payment_register
 from . import account_payment
 from . import order_save_service
+from . import invoice_journal_mapping

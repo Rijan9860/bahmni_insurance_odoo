@@ -441,10 +441,17 @@ class SaleOrderInherit(models.Model):
                             mv_line.qty_done = mv_line.reserved_qty or mv_line.reserved_uom_qty
 
         payment_type = self.payment_type
-        if payment_type == 'cash':
-            journal_id = self.env['account.journal'].search([('name', '=', 'Cash')]).id
-        elif payment_type == 'insurance':
-            journal_id = self.env['account.journal'].search([('name', '=', 'Bank')]).id
+        if payment_type:
+            _logger.info("Payment Type:%s", payment_type)
+            journal_id = self.env['payment.journal.mapping'].search([
+                ('payment_type', '=', payment_type)
+            ]).journal_id.id
+            _logger.info("Journal Id:%s", journal_id)
+
+            if not journal_id:
+                raise UserError("Please define a journal for this company")
+        else:
+            raise UserError("Please add a payment type")
         
         if bool(self.env['ir.config_parameter'].sudo().get_param('bahmni_sale.is_invoice_automated')):
             create_invoices = self._create_invoices()
@@ -485,18 +492,16 @@ class SaleOrderInherit(models.Model):
             If payment type is cash then default journal i.e. cash
             If payment type is insurance then use insurance journal
         '''
-      
-        if self.payment_type != 'partial':
-            payment_type = self.payment_type
-            if payment_type:
-                _logger.info("Payment Type:%s", payment_type)
-                journal_id = self.env['payment.journal.mapping'].search([
-                    ('payment_type', '=', payment_type)
-                ], limit=1).journal_id.id
-                _logger.info("Journal Id:%s", journal_id)
+        payment_type = self.payment_type
+        if payment_type:
+            _logger.info("Payment Type:%s", payment_type)
+            journal_id = self.env['invoice.journal.mapping'].search([
+                ('payment_type', '=', payment_type)
+            ], limit=1).journal_id.id
+            _logger.info("Journal Id:%s", journal_id)
 
-                if not journal_id:
-                    raise UserError("Please define a journal for this company")
+            if not journal_id:
+                raise UserError("Please define a journal for this company")
         else:
             raise UserError("Please add a payment type")
             
