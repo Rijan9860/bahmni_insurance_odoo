@@ -1,6 +1,9 @@
 from odoo import api, models, fields
 from odoo.exceptions import ValidationError, UserError
 import requests
+import socket
+import pdfkit
+import base64
 import logging
 _logger = logging.getLogger(__name__)
 
@@ -38,6 +41,38 @@ class InsuranceClaim(models.Model):
     sale_orders = fields.Many2many('sale.order', string="Sale Orders")
     currency_id = fields.Many2one(related="sale_orders.currency_id", string="Currency", store=True, readonly=True)
     icd_code = fields.Many2many('insurance.disease.code', string="Diagnosis", store=True)
+
+    def convert_url_to_pdf(self, url):
+        _logger.info("Inside convert_url_to_pdf")
+        # Use pdfkit to convert the URL content to a PDF
+        pdf_content = pdfkit.from_url(url, False)
+
+        # Create an attachment with the PDF content
+        attachment = self.env['ir.attachment'].create({
+            'name': 'patient-summary.pdf',
+            'type': 'binary',
+            'datas': base64.b64encode(pdf_content),
+            'res_model': self._name,
+            'res_id': self.id,
+            'mimetype': 'application/pdf'
+        })
+        # Return the attachment ID or any other result as needed
+        return attachment.id
+
+    def generate_opd_one_pager(self):
+        _logger.info("Inside generate_opd_one_pager")
+        hostname = socket.gethostname()
+        _logger.info(hostname)
+        local_ip = socket.gethostbyname(hostname)
+        _logger.info(local_ip)
+        for record in self:
+            partner_uuid = record.partner_uuid
+            external_visit_uuid = record.external_visit_uuid
+            url = "https://192.168.56.101:4433/onepager/?patient={}&visit={}".format(partner_uuid, external_visit_uuid)
+            _logger.info("URL=%s", url)
+            attachment_id = record.convert_url_to_pdf(url)
+            # Append the newly generated attachment ID to the existing ones
+            record.attachment_ids = [(4, attachment_id)]
 
     def _create_claim(self, sale_order):
         _logger.info("Inside _create_claim")
@@ -231,8 +266,7 @@ class InsuranceClaim(models.Model):
                         icd_codes_to_add.append(insurance_disease_code.id)
             # Update the many2many field
             if icd_codes_to_add:
-                self.icd_code = [(4, icd_id) for icd_id in icd_codes_to_add]
-            
+                self.icd_code = [(4, icd_id) for icd_id in icd_codes_to_add]            
 class InsuranceClaimLine(models.Model):
     _name = 'insurance.claim.line'
     _description = 'Insurance Claim Line Module'
