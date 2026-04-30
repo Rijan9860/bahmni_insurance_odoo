@@ -42,6 +42,14 @@ class InsuranceClaim(models.Model):
     currency_id = fields.Many2one(related="sale_orders.currency_id", string="Currency", store=True, readonly=True)
     icd_code = fields.Many2many('insurance.disease.code', string="Diagnosis", store=True)
 
+    def get_server_ip(self):
+        _logger.info("Inside get_server_ip")
+        openmrs_connect_configurations = self.env['insurance.config.settings'].get_values()
+        _logger.info("Openmrs Configuration=%s", openmrs_connect_configurations)
+        if not openmrs_connect_configurations:
+            raise UserError("OpenMRS Configuration Not Set!!")
+        return openmrs_connect_configurations['openmrs_base_url']
+
     def convert_url_to_pdf(self, url):
         _logger.info("Inside convert_url_to_pdf")
         # Use pdfkit to convert the URL content to a PDF
@@ -61,14 +69,12 @@ class InsuranceClaim(models.Model):
 
     def generate_opd_one_pager(self):
         _logger.info("Inside generate_opd_one_pager")
-        hostname = socket.gethostname()
-        _logger.info(hostname)
-        local_ip = socket.gethostbyname(hostname)
-        _logger.info(local_ip)
+        ip_address = self.get_server_ip()
+        _logger.info("Ip Address=%s", ip_address)
         for record in self:
             partner_uuid = record.partner_uuid
             external_visit_uuid = record.external_visit_uuid
-            url = "https://192.168.56.101:4433/onepager/?patient={}&visit={}".format(partner_uuid, external_visit_uuid)
+            url = "{}:4433/onepager/?patient={}&visit={}".format(ip_address, partner_uuid, external_visit_uuid)
             _logger.info("URL=%s", url)
             attachment_id = record.convert_url_to_pdf(url)
             # Append the newly generated attachment ID to the existing ones
