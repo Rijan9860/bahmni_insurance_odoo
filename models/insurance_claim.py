@@ -1,7 +1,6 @@
 from odoo import api, models, fields
 from odoo.exceptions import ValidationError, UserError
 import requests
-import socket
 import pdfkit
 import base64
 import logging
@@ -9,7 +8,7 @@ _logger = logging.getLogger(__name__)
 
 class InsuranceClaim(models.Model):
     _name = 'insurance.claim'
-    _description = 'Insurance Claim Module'
+    _description = 'Insurance Claims'
     _order = "id desc"
 
     claim_code = fields.Char(string="Claim Code")
@@ -41,44 +40,9 @@ class InsuranceClaim(models.Model):
     sale_orders = fields.Many2many('sale.order', string="Sale Orders")
     currency_id = fields.Many2one(related="sale_orders.currency_id", string="Currency", store=True, readonly=True)
     icd_code = fields.Many2many('insurance.disease.code', string="Diagnosis", store=True)
-
-    def get_server_ip(self):
-        _logger.info("Inside get_server_ip")
-        openmrs_connect_configurations = self.env['insurance.config.settings'].get_values()
-        _logger.info("Openmrs Configuration=%s", openmrs_connect_configurations)
-        if not openmrs_connect_configurations:
-            raise UserError("OpenMRS Configuration Not Set!!")
-        return openmrs_connect_configurations['openmrs_base_url']
-
-    def convert_url_to_pdf(self, url):
-        _logger.info("Inside convert_url_to_pdf")
-        # Use pdfkit to convert the URL content to a PDF
-        pdf_content = pdfkit.from_url(url, False)
-
-        # Create an attachment with the PDF content
-        attachment = self.env['ir.attachment'].create({
-            'name': 'patient-summary.pdf',
-            'type': 'binary',
-            'datas': base64.b64encode(pdf_content),
-            'res_model': self._name,
-            'res_id': self.id,
-            'mimetype': 'application/pdf'
-        })
-        # Return the attachment ID or any other result as needed
-        return attachment.id
-
-    def generate_opd_one_pager(self):
-        _logger.info("Inside generate_opd_one_pager")
-        ip_address = self.get_server_ip()
-        _logger.info("Ip Address=%s", ip_address)
-        for record in self:
-            partner_uuid = record.partner_uuid
-            external_visit_uuid = record.external_visit_uuid
-            url = "{}:4433/onepager/?patient={}&visit={}".format(ip_address, partner_uuid, external_visit_uuid)
-            _logger.info("URL=%s", url)
-            attachment_id = record.convert_url_to_pdf(url)
-            # Append the newly generated attachment ID to the existing ones
-            record.attachment_ids = [(4, attachment_id)]
+    insurance_claim_history = fields.One2many('insurance.claim.history', 'claim_id', string="Claim Lines")
+    claim_comments = fields.Text(string="Claim Comments")
+    rejection_reason = fields.Text(string="Rejection Reason")
 
     def _create_claim(self, sale_order):
         _logger.info("Inside _create_claim")
@@ -139,23 +103,31 @@ class InsuranceClaim(models.Model):
             })
             _logger.info("New Claim with added sale order:%s", claim_in_db)
 
-            # Create a insurance claim line
-            self._create_claim_line(claim_in_db, sale_order)
+            try:
+                # Create a insurance claim line
+                self._create_claim_line(claim_in_db, sale_order)
 
-            insurance_claim_lines = self.env['insurance.claim.line'].search([
-                ('claim_id', '=', claim_in_db.id)
-            ])
+                insurance_claim_lines = self.env['insurance.claim.line'].search([
+                    ('claim_id', '=', claim_in_db.id)
+                ])
 
-            _logger.info("Insurance Claim Line:%s", insurance_claim_lines)
-            
-            # Update 'insurance claim line' id in the insurance claim model
-            if insurance_claim_lines:
-                claim_in_db.update({
-                    'insurance_claim_line': insurance_claim_lines
-                })
-            else:
-                _logger.info("No Claim Line Item Present")
-                raise ValidationError("No Claim Line Item Present")
+                _logger.info("Insurance Claim Line:%s", insurance_claim_lines)
+                
+                # Update 'insurance claim line' id in the insurance claim model
+                if insurance_claim_lines:
+                    claim_in_db.update({
+                        'insurance_claim_line': insurance_claim_lines
+                    })
+                else:
+                    _logger.info("No Claim Line Item Present")
+                    raise ValidationError("No Claim Line Item Present")
+                
+                # Add history
+                self._add_history(claim_in_db)
+                
+            except Exception as err:
+                _logger.info("\n Error generating claim draft:%s", err)
+                raise UserError(err)
             
             # To generate pdf report in the ir.attachment model
             _logger.info("Sale Order Name:%s", sale_order.name)
@@ -222,6 +194,15 @@ class InsuranceClaim(models.Model):
         claim_line_in_db = self.env['insurance.claim.line'].create(claim_line_item)
         _logger.info("Claim Line in DB:%s", claim_line_in_db)
 
+    def _add_history(self, claim_in_db):
+        _logger.info("Inside _add_history")
+        claim_history = self.env['insurance.claim.history']._add_claim_history(claim_in_db)
+        _logger.info("Claim History=%s", claim_history)
+        if claim_history:
+            claim_in_db.update({
+                'insurance_claim_history': claim_history
+            })
+
     def action_retrieve_diagnosis(self):
         openmrs_connect_configurations = self.env['insurance.config.settings'].get_values()
         _logger.info("Openmrs Configuration=%s", openmrs_connect_configurations)
@@ -272,16 +253,96 @@ class InsuranceClaim(models.Model):
                         icd_codes_to_add.append(insurance_disease_code.id)
             # Update the many2many field
             if icd_codes_to_add:
-                self.icd_code = [(4, icd_id) for icd_id in icd_codes_to_add]            
+                self.icd_code = [(4, icd_id) for icd_id in icd_codes_to_add]   
+
+    def get_server_ip(self):
+        _logger.info("Inside get_server_ip")
+        openmrs_connect_configurations = self.env['insurance.config.settings'].get_values()
+        _logger.info("Openmrs Configuration=%s", openmrs_connect_configurations)
+        if not openmrs_connect_configurations:
+            raise UserError("OpenMRS Configuration Not Set!!")
+        return openmrs_connect_configurations['openmrs_base_url']
+
+    def convert_url_to_pdf(self, url):
+        _logger.info("Inside convert_url_to_pdf")
+        # Use pdfkit to convert the URL content to a PDF
+        pdf_content = pdfkit.from_url(url, False)
+
+        # Create an attachment with the PDF content
+        attachment = self.env['ir.attachment'].create({
+            'name': 'patient-summary.pdf',
+            'type': 'binary',
+            'datas': base64.b64encode(pdf_content),
+            'res_model': self._name,
+            'res_id': self.id,
+            'mimetype': 'application/pdf'
+        })
+        # Return the attachment ID or any other result as needed
+        return attachment.id
+
+    def generate_opd_one_pager(self):
+        _logger.info("Inside generate_opd_one_pager")
+        ip_address = self.get_server_ip()
+        _logger.info("Ip Address=%s", ip_address)
+        for record in self:
+            partner_uuid = record.partner_uuid
+            external_visit_uuid = record.external_visit_uuid
+            url = "{}:4433/onepager/?patient={}&visit={}".format(ip_address, partner_uuid, external_visit_uuid)
+            _logger.info("URL=%s", url)
+            attachment_id = record.convert_url_to_pdf(url)
+            # Append the newly generated attachment ID to the existing ones
+            record.attachment_ids = [(4, attachment_id)]
+
 class InsuranceClaimLine(models.Model):
     _name = 'insurance.claim.line'
-    _description = 'Insurance Claim Line Module'
+    _description = 'Insurance Claim Line Items'
 
     claim_id = fields.Many2one('insurance.claim', string="Claim Id", required=True, ondelete="cascade", index=True, copy=False)
-    product_id = fields.Many2one('product.product', string="Product", domain=[('sales_ok', '=', True)], ondelete="Restrict", required=True)
+    product_id = fields.Many2one('product.product', string="Product", domain=[('sale_ok', '=', True)], ondelete="Restrict", required=True)
     imis_product = fields.Many2one('insurance.odoo.product.map', string="Insurance Item", change_default=True)
     imis_product_code = fields.Char(string="IMIS Product Code", change_default=True)
     product_qty = fields.Integer(string="Qty", requred=True)
     price_unit = fields.Float(string="Unit Price")
     total = fields.Monetary(string="Total Price", currency_field="currency_id")
     currency_id = fields.Many2one(related='claim_id.currency_id', string="Currency", readonly=True, required=True)
+
+class InsuranceClaimHistory(models.Model):
+    _name = 'insurance.claim.history'
+    _description = 'Insurance Claim History'
+
+    claim_id = fields.Many2one('insurance.claim', string="Claim Id", required=True, ondelete="cascade", index=True, copy=False)
+    partner_id = fields.Many2one(related="claim_id.partner_id", string="Insuree", readonly=True, index=True, tracking=True)
+    claim_manager_id = fields.Many2one(related="claim_id.claim_manager_id", store=True, string="Claims Manager", readonly=True)
+    claim_code = fields.Char(string="Claim Code")
+    claim_status = fields.Selection([
+        ('draft', 'Draft'),
+        ('confirmed', 'Confirmed'),
+        ('entered', 'Entered'),
+        ('uploaded', 'Uploaded'),
+        ('submitted', 'Submitted'),
+        ('checked', 'Checked'),
+        ('valuated', 'Valuated'),
+        ('rejected', 'Rejected'),
+        ('processed', 'Processed'),
+        ('passed', 'Passed')
+    ], string="Claim Status", default="draft")
+    claim_comments = fields.Text(string="Claim Comments")
+    rejection_reason = fields.Text(string="Rejection Reasons")
+
+    @api.model
+    def _add_claim_history(self, claim):
+        _logger.info("Inside _add_claim_history")
+        claim_history = {
+            'claim_id': claim.id,
+            'partner_id': claim.partner_id.id,
+            'claim_manager_id': claim.claim_manager_id.id,
+            'claim_code': claim.claim_code,
+            'claim_status': claim.state,
+            'claim_comments': claim.claim_comments,
+            'rejection_reason': claim.rejection_reason
+        }
+        _logger.info(claim_history)
+        return self.env['insurance.claim.history'].create(claim_history)
+
+
+

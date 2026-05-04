@@ -47,11 +47,24 @@
                         <page string="Diagnosis">
                             <field name="icd_code">
                                 <tree editable="bottom">
-                                    <field name="icd_code" />
-                                    <field name="diagnosis" />
+                                    <field name="icd_code"/>
+                                    <field name="diagnosis"/>
                                 </tree>
                             </field>
                             <button name="action_retrieve_diagnosis" string="Retrieve Diagnosis" type="object" class="btn-primary"/>
+                        </page>
+                        <page string="Claim History">
+                            <field name="insurance_claim_history">
+                                <tree editable="bottom">
+                                    <field name="claim_code"/>
+                                    <field name="partner_id"/>
+                                    <field name="claim_manager_id"/>
+                                    <field name="claim_status"/>
+                                    <field name="claim_comments"/>
+                                    <field name="rejection_reason"/>
+                                    <field name="create_date"/>
+                                </tree>
+                            </field>
                         </page>
                     </notebook>
                 </sheet>
@@ -76,12 +89,14 @@
         <field name="res_model">insurance.claim</field>
         <field name="view_mode">tree,form</field>
         <field name="view_id" ref="insurance_claim_tree_view"></field>
+        <field name="domain">[('state', 'in', ('draft', 'confirmed'))]</field>
     </record>
     <record id="action_submitted_claims" model="ir.actions.act_window">
         <field name="name">Submitted Claims</field>
         <field name="res_model">insurance.claim</field>
         <field name="view_mode">tree,form</field>
         <field name="view_id" ref="insurance_claim_tree_view"></field>
+        <field name="domain">[('state', 'not in', ('draft', 'confirmed', 'rejected'))]</field>
     </record>
     <record id="action_rejected_claims" model="ir.actions.act_window">
         <field name="name">Rejected Claims</field>
