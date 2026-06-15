@@ -66,5 +66,5 @@
         <field name="view_mode">form</field>
         <field name="view_id" ref="insurance_config_settings_form_view"></field>
     </record>
-    <menuitem id="menu_emr_settings" name="EMR Settings" sequence="10" parent="menu_emr_configuration" action="action_insurance_config_settings"/>
+    <menuitem id="menu_emr_settings" name="EMR Settings" sequence="5" parent="menu_emr_configuration" action="action_insurance_config_settings"/>
 </odoo>

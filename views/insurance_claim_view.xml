@@ -5,19 +5,29 @@
         <field name="model">insurance.claim</field>
         <field name="arch" type="xml">
             <form string="Claims">
+                <header>
+                    <button name="action_confirm" string="Confirm Claim" type="object" class="btn-primary" 
+                        attrs="{'invisible': [('state', 'in', ['confirmed', 'entered', 'submitted', 'checked', 'valuated'])]}"/>
+                    <button name="action_claim_submit" string="Submit Claim" type="object" class="btn-primary" 
+                        attrs="{'invisible': [('state', 'in', ['draft', 'entered', 'submitted', 'checked', 'valuated', 'processed', 'rejected'])]}"/>
+                    <field name="state" statusbar_visible="draft, confirmed, submitted" widget="statusbar"/>
+                </header>
                 <sheet>
                     <group> 
                         <group>
                             <field name="claim_code"/>
-                            <field name="partner_id"/>
-                            <field name="nhis_number"/>
+                            <field name="partner_id" readonly="1"/>
+                            <field name="nhis_number" readonly="1"/>
                             <field name="nmc_number"/>
-                            <field name="care_setting"/>
+                            <field name="care_setting" readonly="1"/>
                             <field name="claim_uuid"/>
                         </group>
                         <group>
                             <field name="claimed_date"/>
                             <field name="claim_manager_id"/>
+                            <field name="external_visit_uuid"/>
+                            <field name="generated_claim_code"/>
+                            <field name="claim_explanation"/>
                         </group>
                     </group>
                     <notebook>
@@ -28,9 +38,12 @@
                                     <field name="imis_product_code"/>
                                     <field name="product_qty"/>
                                     <field name="price_unit"/>
-                                    <field name="total"/>
+                                    <field name="total_price"/>
                                 </tree>
                             </field>
+                            <group class="oe_subtotal_footer oe_right" colspan="2">
+                                <field name="claimed_amount_total"/>
+                            </group>
                         </page>
                         <page string="Sale Orders">
                             <field name="sale_orders"/>
@@ -103,18 +116,21 @@
         <field name="res_model">insurance.claim</field>
         <field name="view_mode">tree,form</field>
         <field name="view_id" ref="insurance_claim_tree_view"></field>
+        <field name="domain">[('state', '=', 'rejected')]</field>
     </record>
     <record id="action_checked_claims" model="ir.actions.act_window">
         <field name="name">Checked Claims</field>
         <field name="res_model">insurance.claim</field>
         <field name="view_mode">tree,form</field>
         <field name="view_id" ref="insurance_claim_tree_view"></field>
+        <field name="domain">[('state', '=', 'checked')]</field>
     </record>
     <record id="action_approved_claims" model="ir.actions.act_window">
         <field name="name">Approved Claims</field>
         <field name="res_model">insurance.claim</field>
         <field name="view_mode">tree,form</field>
         <field name="view_id" ref="insurance_claim_tree_view"></field>
+        <field name="domain">[('state', '=', 'passed')]</field>
     </record>
     <menuitem id="menu_claims" name="Claims" sequence="10" parent="menu_insurance_claims" action="action_insurance_claims"/>
     <menuitem id="menu_submitted_claims" name="Submitted Claims" sequence="10" parent="menu_insurance_claims" action="action_submitted_claims"/>
