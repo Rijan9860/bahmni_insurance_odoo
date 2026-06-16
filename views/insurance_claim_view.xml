@@ -10,6 +10,9 @@
                         attrs="{'invisible': [('state', 'in', ['confirmed', 'entered', 'submitted', 'checked', 'valuated'])]}"/>
                     <button name="action_claim_submit" string="Submit Claim" type="object" class="btn-primary" 
                         attrs="{'invisible': [('state', 'in', ['draft', 'entered', 'submitted', 'checked', 'valuated', 'processed', 'rejected'])]}"/>
+                    <button name="action_refund" string="Refund" type="object" class="btn-primary"
+                        attrs="{'invisible': [('state', 'not in', ['entered', 'checked'])]}" 
+                        confirm="This action will refund products/services in IMIS and cannot be undone. Do you want to continue?"/>
                     <field name="state" statusbar_visible="draft, confirmed, submitted" widget="statusbar"/>
                 </header>
                 <sheet>

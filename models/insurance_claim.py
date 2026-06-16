@@ -572,6 +572,35 @@ class InsuranceClaim(models.Model):
         except Exception as err:
             _logger.error(err)
             raise UserError(err)
+        
+    def action_refund(self):
+        _logger.info("Action Refund Button Clicked!!")
+        for claim in self:
+            for claim_line in claim.insurance_claim_line:
+                if claim_line.product_id.type == "product":
+                    type = "item"
+                    _logger.info("Type:%s", type)
+                elif claim_line.product_id.type == "service":
+                    type = "service"
+                    _logger.info("Type:%s", type)
+
+                refund_request = { 
+                    "claimId": claim.claim_code,
+                    "type": type,
+                    "codes":[]
+                }
+            for claim_line in claim.insurance_claim_line:
+                if claim_line.imis_product_code:
+                    refund_request["codes"].append(claim_line.imis_product_code)
+            
+            _logger.info("Refund Request---->%s", refund_request)
+
+            response = self.env['insurance.connect']._submit_refund(refund_request)
+            _logger.info("Response=%s", response)
+            if response is None:
+                raise ValidationError("Nothing To Refund!! Check Claim Status in IMIS!!")
+            else:
+                raise ValidationError("Message: " + str(response.get('message') + "\nTotal Refunded Amount: " + str(response.get('refunded'))) )
             
     def update_claim_from_claim_response(self, claim, response):
         _logger.info("Inside update_claim_from_claim_response")
