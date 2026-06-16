@@ -162,20 +162,20 @@ class InsuranceClaim(models.Model):
                 
                 # Add history
                 self._add_history(claim_in_db)
-                
+
+                 # To generate pdf report in the ir.attachment model
+                _logger.info("Sale Order Name:%s", sale_order.name)
+                account_move_id = self.env['account.move'].search([
+                    ('invoice_origin', '=', sale_order.name)
+                ])
+                _logger.info("Account Move Id:%s", account_move_id)
+                claim_id = claim_in_db
+                _logger.info("Claim Id:%s", claim_id)
+                self.env['account.move'].action_generate_attachment(account_move_id, claim_id)
+                    
             except Exception as err:
                 _logger.info("\n Error generating claim draft:%s", err)
                 raise UserError(err)
-            
-            # To generate pdf report in the ir.attachment model
-            _logger.info("Sale Order Name:%s", sale_order.name)
-            account_move_id = self.env['account.move'].search([
-                ('invoice_origin', '=', sale_order.name)
-            ])
-            _logger.info("Account Move Id:%s", account_move_id)
-            claim_id = claim_in_db
-            _logger.info("Claim Id:%s", claim_id)
-            self.env['account.move'].action_generate_attachment(account_move_id, claim_id)
         else:
             _logger.info("Payment Type:%s", sale_order.payment_type)
        
@@ -234,7 +234,8 @@ class InsuranceClaim(models.Model):
 
     def _add_history(self, claim_in_db):
         _logger.info("Inside _add_history")
-        claim_history = self.env['insurance.claim.history']._add_claim_history(claim_in_db)
+        claim_history_line = self.env['insurance.claim.history']._add_claim_history(claim_in_db)
+        claim_history = self.env['insurance.claim.history'].search([('claim_id', '=', claim_in_db.id)])
         _logger.info("Claim History=%s", claim_history)
         if claim_history:
             claim_in_db.update({
@@ -356,11 +357,11 @@ class InsuranceClaim(models.Model):
 
                 self._add_history(claim)
 
-            # Validate and then confirm
-            for claim_line in claim.insurance_claim_line:
-                _logger.info(claim_line)
-                if not claim_line.imis_product_code:
-                    raise UserError("%s has not been mapped. Please map the product and retry again."%(claim_line.product_id.name))
+                # Validate and then confirm
+                for claim_line in claim.insurance_claim_line:
+                    _logger.info(claim_line)
+                    if not claim_line.imis_product_code:
+                        raise UserError("%s has not been mapped. Please map the product and retry again."%(claim_line.product_id.name))
 
     @api.depends('insurance_claim_line.total_price')      
     def _claimed_amount_all(self):
@@ -419,8 +420,9 @@ class InsuranceClaim(models.Model):
         _logger.info("Visit UUID=%s", visit_uuid)
 
         visit_type = visit_data.get('visitType')
+        _logger.info("lower visit type=%s", visit_type)
 
-        if visit_type == 'IPD':
+        if visit_type.lower() == 'ipd':
             _logger.info("Visit Type=%s", visit_type)
             admission_details = visit_data.get('admissionDetails')
             if admission_details is not None:
@@ -463,9 +465,9 @@ class InsuranceClaim(models.Model):
                         'claimed_date': fields.Datetime.now()
                     })
                     
-                    _logger.info("Claim Code:%s", claim.claim_code)
                     _logger.info("Claim State:%s", claim.state)
                     _logger.info("Claim Date=%s", claim.claimed_date)
+                    _logger.info("Claim Code:%s", claim.claim_code)
 
                     care_setting_mapping = {
                         'opd': 'O',
@@ -570,7 +572,7 @@ class InsuranceClaim(models.Model):
         except Exception as err:
             _logger.error(err)
             raise UserError(err)
-        
+            
     def update_claim_from_claim_response(self, claim, response):
         _logger.info("Inside update_claim_from_claim_response")
         claim.claim_uuid = response['claimUUID']

@@ -129,7 +129,7 @@ class InsuranceConnect(models.TransientModel):
                 raise UserError(error_msg)
         except Exception as err:
             _logger.error("\n Processing event threw error:%s", err)
-            
+   
     def response_processor(self, response):
         _logger.info("********Response********")
         _logger.info("Response Status %s", response.status)
