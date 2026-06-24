@@ -75,58 +75,6 @@ class AccountMoveInherit(models.Model):
                     'type': 'ir.actions.act_window',
                 }
             
-    # def action_post(self):
-    #     _logger.info("Inherit action_post")
-    #     for inv in self:
-    #         final_invoice_value = (inv.amount_total - inv.discount) + inv.round_off_amount
-
-    #         for move_line in inv.line_ids:
-    #             if move_line.display_type == 'payment_term':
-    #                 if inv.move_type == 'out_invoice':
-    #                     move_line.debit = final_invoice_value
-    #                     move_line.credit = 0
-    #                 if inv.move_type == 'out_refund':
-    #                     move_line.credit = final_invoice_value
-    #                     move_line.debit = 0
-
-    #         if inv.discount:
-    #             discount_account = inv.disc_acc_id
-    #             if not discount_account:
-    #                 raise UserError(_("Please configure a Discount Account on the Journal."))
-
-    #             _logger.info("Discount value for invoice %s: %s", inv.name, inv.discount)
-
-    #             if inv.move_type == 'out_refund':
-    #                 _logger.info("Move Type=%s", inv.move_type)
-    #                 self.env['account.move.line'].create({
-    #                     'move_id': inv.id,
-    #                     'name': 'Discount',
-    #                     'account_id': discount_account.id,
-    #                     'partner_id': inv.partner_id.id,
-    #                     'quantity': 1.0,
-    #                     'price_unit': inv.discount,
-    #                     'credit': inv.discount,
-    #                     'debit': 0.0,
-    #                     'display_type': 'epd',
-    #                     'date_maturity':inv.invoice_date
-    #                 })
-    #             else:
-    #                 _logger.info("Move Type=%s", inv.move_type)
-    #                 self.env['account.move.line'].create({
-    #                     'move_id': inv.id,
-    #                     'name': 'Discount',
-    #                     'account_id': discount_account.id,
-    #                     'partner_id': inv.partner_id.id,
-    #                     'quantity': 1.0,
-    #                     'price_unit': inv.discount,
-    #                     'debit': inv.discount,
-    #                     'credit': 0.0,
-    #                     'display_type': 'epd',
-    #                     'date_maturity':inv.invoice_date
-    #                 })
-
-    #     return super(AccountMoveInherit, self).action_post()
-
     def action_post(self):
         _logger.info("Inherit action_post")
         for inv in self:
@@ -149,7 +97,7 @@ class AccountMoveInherit(models.Model):
                 _logger.info("Discount value for invoice %s: %s", inv.name, inv.discount)
 
                 existing_discount_line = inv.line_ids.filtered(
-                    lambda l: l.display_type == 'epd' and l.name == 'Discount'
+                    lambda l: l.display_type == 'epd' and l.name == 'Discount' or l.name == 'Copayment'
                 )
 
                 if discount_account.name == 'Copayment':
